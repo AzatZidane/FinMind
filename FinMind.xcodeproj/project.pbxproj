@@ -8,12 +8,20 @@
 
 /* Begin PBXBuildFile section */
 		7001101C2E631CAD00961ADA /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110172E631CAD00961ADA /* CalendarView.swift */; };
-		7001101D2E631CAD00961ADA /* BudgetItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110132E631CAD00961ADA /* BudgetItems.swift */; };
 		7001101E2E631CAD00961ADA /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110152E631CAD00961ADA /* UserProfile.swift */; };
 		7001101F2E631CAD00961ADA /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110192E631CAD00961ADA /* PlanView.swift */; };
 		700110202E631CAD00961ADA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001101A2E631CAD00961ADA /* SettingsView.swift */; };
 		700110212E631CAD00961ADA /* Plan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110142E631CAD00961ADA /* Plan.swift */; };
 		700110222E631CAD00961ADA /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110182E631CAD00961ADA /* OverviewView.swift */; };
+		7001107F2E63813200961ADA /* AddExpenseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001107A2E63813200961ADA /* AddExpenseView.swift */; };
+		700110802E63813200961ADA /* AddDebtView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110792E63813200961ADA /* AddDebtView.swift */; };
+		700110812E63813200961ADA /* AddGoalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001107B2E63813200961ADA /* AddGoalView.swift */; };
+		700110832E63813200961ADA /* AddIncomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001107C2E63813200961ADA /* AddIncomeView.swift */; };
+		700110862E63815600961ADA /* CalendarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110842E63815600961ADA /* CalendarListView.swift */; };
+		700110892E63816A00961ADA /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110872E63816A00961ADA /* Persistence.swift */; };
+		7001108C2E63818A00961ADA /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001108A2E63818A00961ADA /* AppState.swift */; };
+		7001108D2E63818A00961ADA /* FinanceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001108B2E63818A00961ADA /* FinanceModels.swift */; };
+		700110932E63875E00961ADA /* BudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700110922E63875E00961ADA /* BudgetView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,13 +45,21 @@
 		70010FE82E63198400961ADA /* FinMind.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FinMind.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		70010FF62E63198600961ADA /* FinMindTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FinMindTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		700110002E63198600961ADA /* FinMindUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FinMindUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		700110132E631CAD00961ADA /* BudgetItems.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetItems.swift; sourceTree = "<group>"; };
 		700110142E631CAD00961ADA /* Plan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plan.swift; sourceTree = "<group>"; };
 		700110152E631CAD00961ADA /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		700110172E631CAD00961ADA /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		700110182E631CAD00961ADA /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 		700110192E631CAD00961ADA /* PlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
 		7001101A2E631CAD00961ADA /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		700110792E63813200961ADA /* AddDebtView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddDebtView.swift; sourceTree = "<group>"; };
+		7001107A2E63813200961ADA /* AddExpenseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddExpenseView.swift; sourceTree = "<group>"; };
+		7001107B2E63813200961ADA /* AddGoalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGoalView.swift; sourceTree = "<group>"; };
+		7001107C2E63813200961ADA /* AddIncomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddIncomeView.swift; sourceTree = "<group>"; };
+		700110842E63815600961ADA /* CalendarListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarListView.swift; sourceTree = "<group>"; };
+		700110872E63816A00961ADA /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		7001108A2E63818A00961ADA /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		7001108B2E63818A00961ADA /* FinanceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceModels.swift; sourceTree = "<group>"; };
+		700110922E63875E00961ADA /* BudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -92,6 +108,7 @@
 		70010FDF2E63198400961ADA = {
 			isa = PBXGroup;
 			children = (
+				700110882E63816A00961ADA /* Services */,
 				700110162E631CAD00961ADA /* Models */,
 				7001101B2E631CAD00961ADA /* Views */,
 				70010FEA2E63198400961ADA /* FinMind */,
@@ -114,7 +131,8 @@
 		700110162E631CAD00961ADA /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				700110132E631CAD00961ADA /* BudgetItems.swift */,
+				7001108A2E63818A00961ADA /* AppState.swift */,
+				7001108B2E63818A00961ADA /* FinanceModels.swift */,
 				700110142E631CAD00961ADA /* Plan.swift */,
 				700110152E631CAD00961ADA /* UserProfile.swift */,
 			);
@@ -124,12 +142,42 @@
 		7001101B2E631CAD00961ADA /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				700110852E63815600961ADA /* Calendar */,
+				7001107E2E63813200961ADA /* Budget */,
 				700110172E631CAD00961ADA /* CalendarView.swift */,
 				700110182E631CAD00961ADA /* OverviewView.swift */,
 				700110192E631CAD00961ADA /* PlanView.swift */,
 				7001101A2E631CAD00961ADA /* SettingsView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		7001107E2E63813200961ADA /* Budget */ = {
+			isa = PBXGroup;
+			children = (
+				700110922E63875E00961ADA /* BudgetView.swift */,
+				700110792E63813200961ADA /* AddDebtView.swift */,
+				7001107A2E63813200961ADA /* AddExpenseView.swift */,
+				7001107B2E63813200961ADA /* AddGoalView.swift */,
+				7001107C2E63813200961ADA /* AddIncomeView.swift */,
+			);
+			path = Budget;
+			sourceTree = "<group>";
+		};
+		700110852E63815600961ADA /* Calendar */ = {
+			isa = PBXGroup;
+			children = (
+				700110842E63815600961ADA /* CalendarListView.swift */,
+			);
+			path = Calendar;
+			sourceTree = "<group>";
+		};
+		700110882E63816A00961ADA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				700110872E63816A00961ADA /* Persistence.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -277,8 +325,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				7001101C2E631CAD00961ADA /* CalendarView.swift in Sources */,
-				7001101D2E631CAD00961ADA /* BudgetItems.swift in Sources */,
+				7001108C2E63818A00961ADA /* AppState.swift in Sources */,
+				7001108D2E63818A00961ADA /* FinanceModels.swift in Sources */,
+				7001107F2E63813200961ADA /* AddExpenseView.swift in Sources */,
+				700110892E63816A00961ADA /* Persistence.swift in Sources */,
+				700110862E63815600961ADA /* CalendarListView.swift in Sources */,
+				700110802E63813200961ADA /* AddDebtView.swift in Sources */,
+				700110812E63813200961ADA /* AddGoalView.swift in Sources */,
+				700110832E63813200961ADA /* AddIncomeView.swift in Sources */,
 				7001101E2E631CAD00961ADA /* UserProfile.swift in Sources */,
+				700110932E63875E00961ADA /* BudgetView.swift in Sources */,
 				7001101F2E631CAD00961ADA /* PlanView.swift in Sources */,
 				700110202E631CAD00961ADA /* SettingsView.swift in Sources */,
 				700110212E631CAD00961ADA /* Plan.swift in Sources */,

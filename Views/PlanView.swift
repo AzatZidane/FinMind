@@ -1,37 +1,46 @@
+// Views/PlanView.swift
 import SwiftUI
 
 struct PlanView: View {
-    @State private var profile: UserProfile = .sample
-    private var plan: Plan { Plan(profile: profile) }
+    @EnvironmentObject var app: AppState
+
+    private var result: PlanResult {
+        PlanEngine.makePlan(app: app)
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Доходы") {
-                    ForEach(profile.incomes) { i in row(name: i.name, amount: i.monthlyAmount) }
+                Section("Свободно в месяц") {
+                    Text(result.sdp.moneyString)
+                        .font(.title.bold())
+                        .monospacedDigit()
                 }
-                Section("Расходы") {
-                    ForEach(profile.expenses) { e in row(name: e.name, amount: e.monthlyAmount) }
+
+                Section("Распределение СДП") {
+                    ForEach(result.allocations) { alloc in
+                        HStack {
+                            Text(alloc.kind.rawValue)
+                            Spacer()
+                            Text(alloc.amount.moneyString).monospacedDigit()
+                        }
+                        if let r = alloc.rationale {
+                            Text(r).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                Section("Итог") {
-                    row(name: "Доход", amount: plan.monthlyIncome)
-                    row(name: "Расход", amount: plan.monthlySpending)
-                    row(name: "Профицит", amount: plan.monthlyIncome - plan.monthlySpending, bold: true)
+
+                if !result.notes.isEmpty {
+                    Section("Заметки") {
+                        ForEach(result.notes, id: \.self) { Text($0) }
+                    }
                 }
             }
             .navigationTitle("План")
         }
     }
-
-    @ViewBuilder
-    private func row(name: String, amount: Double, bold: Bool = false) -> some View {
-        HStack {
-            Text(name)
-            Spacer()
-            Text(amount, format: .currency(code: profile.currencyCode))
-                .fontWeight(bold ? .bold : .regular)
-        }
-    }
 }
 
-#Preview { NavigationStack { PlanView() } }
+#Preview {
+    PlanView().environmentObject(AppState())
+}

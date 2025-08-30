@@ -1,15 +1,18 @@
 import Foundation
 
-struct UserProfile: Identifiable, Codable, Hashable {
-    var id = UUID()
-    var incomes: [Income] = []
-    var expenses: [Expense] = []
-    var goals: [Goal] = []
-    var currencyCode: String = Locale.current.currency?.identifier ?? "USD"
+struct UserProfile: Codable, Hashable, Equatable {
+    var nickname: String?
+    var currencyCode: String
+    /// 2 = Понедельник, 1 = Воскресенье (как в Calendar.firstWeekday)
+    var firstWeekday: Int
 
-    static let sample = UserProfile(
-        incomes: [Income(name: "Зарплата", amount: 1500)],
-        expenses: [Expense(name: "Аренда", amount: 600)],
-        goals: [Goal(name: "Подушка", targetAmount: 3000)]
-    )
+    init(
+        nickname: String? = nil,
+        currencyCode: String = Locale.current.currency?.identifier ?? "RUB",
+        firstWeekday: Int = 2
+    ) {
+        self.nickname = nickname
+        self.currencyCode = currencyCode
+        self.firstWeekday = firstWeekday
+    }
 }

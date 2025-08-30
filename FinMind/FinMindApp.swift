@@ -7,9 +7,12 @@ struct FinMindApp: App {
         loaded.startAutoSave()
         return loaded
     }()
-    
-    var body: some View {
-        ContentView()
-            .environmentObject(appState)
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(appState)
+        }
     }
 }
+
