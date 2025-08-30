@@ -5,10 +5,11 @@ struct ContentView: View {
         TabView {
             // Вкладка 1 — «Данные» (экран данных/бюджета)
             // Используем существующий экран обзора как «Данные».
-            OverviewView()
+            BudgetView()
                 .tabItem {
                     Label("Данные", systemImage: "list.bullet.rectangle")
                 }
+
             
             // Вкладка 2 — «План» (аналитика/СДП)
             PlanView()
