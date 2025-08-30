@@ -30,20 +30,18 @@ struct AddIncomeView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // --- Секция 1: описание дохода
+                // --- Секция 1: описание
                 Section {
                     TextField("Название", text: $name)
-                        .textInputAutocapitalization(.words)
+                        .capWordsIfAvailable()          // безопасная автокапитализация на iOS
                     TextField("Сумма", text: $amount)
-                    #if os(iOS)
-                        .keyboardType(.decimalPad)
-                    #endif
+                        .decimalKeyboardIfAvailable()   // безопасная цифровая клавиатура на iOS
                     Toggle("Постоянный доход", isOn: $isRecurring)
                 } header: {
                     Text("Описание")
                 }
 
-                // --- Секция 2: параметры (в зависимости от типа)
+                // --- Секция 2: параметры
                 if isRecurring {
                     Section {
                         Picker("Периодичность", selection: $periodicity) {
@@ -51,7 +49,6 @@ struct AddIncomeView: View {
                                 Text(p.rawValue).tag(p as Periodicity)
                             }
                         }
-
                         DatePicker("Дата начала", selection: $startDate, displayedComponents: .date)
 
                         Toggle("Указать дату окончания", isOn: $hasEndDate)
@@ -96,7 +93,7 @@ struct AddIncomeView: View {
         }
     }
 
-    // MARK: - Валидация и сохранение
+    // MARK: - Сохранение
 
     private func save() {
         // Валидация суммы
@@ -112,7 +109,6 @@ struct AddIncomeView: View {
         }
 
         if isRecurring {
-            // Доп. валидация дат
             if hasEndDate && endDate < startDate {
                 showValidation("Дата окончания не может быть раньше даты начала")
                 return
@@ -152,6 +148,31 @@ struct AddIncomeView: View {
     private func showValidation(_ msg: String) {
         errorText = msg
         showError = true
+    }
+}
+
+// Платформенно‑безопасные модификаторы, чтобы не падать на macOS / старых iOS
+private extension View {
+    @ViewBuilder
+    func capWordsIfAvailable() -> some View {
+        #if canImport(UIKit)
+        if #available(iOS 15.0, *) {
+            self.textInputAutocapitalization(.words)
+        } else {
+            self.autocapitalization(.words)
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func decimalKeyboardIfAvailable() -> some View {
+        #if canImport(UIKit)
+        self.keyboardType(.decimalPad)
+        #else
+        self
+        #endif
     }
 }
 
