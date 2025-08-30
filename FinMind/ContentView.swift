@@ -3,28 +3,23 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         TabView {
-            // Вкладка 1 — «Данные» (экран данных/бюджета)
-            // Используем существующий экран обзора как «Данные».
             BudgetView()
                 .tabItem {
                     Label("Данные", systemImage: "list.bullet.rectangle")
                 }
-
             
-            // Вкладка 2 — «План» (аналитика/СДП)
-            PlanView()
+            // Заглушка для "План" (будет подключён FinanceEngine позже)
+            PlanViewPlaceholder()
                 .tabItem {
                     Label("План", systemImage: "chart.pie.fill")
                 }
             
-            // Вкладка 3 — «Советник» (ИИ)
-            AdvisorView()
+            AdvisorViewPlaceholder()
                 .tabItem {
                     Label("Советник", systemImage: "sparkles")
                 }
             
-            // Вкладка 4 — «Настройки»
-            SettingsView()
+            SettingsViewPlaceholder()
                 .tabItem {
                     Label("Настройки", systemImage: "gearshape.fill")
                 }
@@ -32,10 +27,18 @@ struct ContentView: View {
     }
 }
 
-// Простейшая заглушка экрана «Советник»
-// Добавлена здесь, чтобы сборка прошла даже если отдельного файла AdvisorView.swift ещё нет.
-// Позже можно вынести в отдельный файл и подключить ChatService.
-struct AdvisorView: View {
+// MARK: - Placeholders (минимальные заглушки для сборки)
+struct PlanViewPlaceholder: View {
+    var body: some View {
+        NavigationStack {
+            Text("Здесь будет аналитика и СДП")
+                .foregroundStyle(.secondary)
+                .navigationTitle("План")
+        }
+    }
+}
+
+struct AdvisorViewPlaceholder: View {
     @State private var question: String = ""
     private let limit = 100
     
@@ -50,7 +53,7 @@ struct AdvisorView: View {
                 HStack {
                     TextField("Ваш вопрос (до 100 символов)…", text: $question)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: question) { newValue in
+                        .onChange(of: question, initial: false) { oldValue, newValue in
                             if newValue.count > limit {
                                 question = String(newValue.prefix(limit))
                             }
@@ -73,6 +76,18 @@ struct AdvisorView: View {
             }
             .padding()
             .navigationTitle("Советник")
+        }
+    }
+}
+
+struct SettingsViewPlaceholder: View {
+    var body: some View {
+        NavigationStack {
+            List {
+                Text("Настройки профиля, темы, обратная связь и др.")
+                    .foregroundStyle(.secondary)
+            }
+            .navigationTitle("Настройки")
         }
     }
 }
