@@ -1,0 +1,30 @@
+# Xcode / Swift
+DerivedData/
+build/
+*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+*.xcuserstate
+*.xcuserdatad*
+*.xccheckout
+*.moved-aside
+*.swiftpm/
+
+# User-specific
+*.xcuserdatad
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Swift Package Manager
+.build/
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/
+Carthage/Build/
+
+# Misc
+.DS_Store
+*.orig
+*.rej
