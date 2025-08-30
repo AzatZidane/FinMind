@@ -1,27 +1,33 @@
 import SwiftUI
 
 struct AddGoalView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var app: AppState
-    
+    @Environment(\.dismiss) private var dismiss
+
     @State private var name: String = ""
     @State private var targetAmount: String = ""
-    @State private var deadline: Date = Calendar.app.date(byAdding: .month, value: 6, to: Date()) ?? Date()
+    @State private var deadline: Date = Calendar.current.date(byAdding: .month, value: 6, to: Date()) ?? Date()
     @State private var priority: Int = 2
-    
-    @State private var showError = false
-    @State private var errorText = ""
-    
+    @State private var note: String = ""
+
+    @State private var showError: Bool = false
+    @State private var errorText: String = ""
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Цель") {
+                Section(header: Text("Цель")) {
                     TextField("Название", text: $name)
-                    TextField("Сумма", text: $targetAmount).keyboardType(.decimalPad)
+                    TextField("Сумма", text: $targetAmount)
+                        .keyboardType(.decimalPad)
                     DatePicker("Дедлайн", selection: $deadline, displayedComponents: .date)
                     Stepper(value: $priority, in: 1...3) {
                         Text("Приоритет: \(priority)")
                     }
+                }
+
+                Section(header: Text("Примечание")) {
+                    TextField("Опционально", text: $note)
                 }
             }
             .navigationTitle("Новая цель")
@@ -40,27 +46,36 @@ struct AddGoalView: View {
             }
         }
     }
-    
+
     private func save() {
         guard let amt = Double(targetAmount.replacingOccurrences(of: ",", with: ".")), amt > 0 else {
-            showError("Введите корректную сумму (> 0)")
+            showValidation("Введите корректную сумму (> 0)")
             return
         }
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
-            showError("Введите название")
+
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            showValidation("Введите название")
             return
         }
-        let g = Goal(name: name, targetAmount: amt, deadline: deadline, priority: priority)
-        app.addGoal(g)
+
+        let goal = Goal(
+            name: name,
+            targetAmount: amt,
+            deadline: deadline,
+            priority: priority,
+            note: note.isEmpty ? nil : note
+        )
+        app.addGoal(goal)
         dismiss()
     }
-    
-    private func showError(_ msg: String) {
+
+    private func showValidation(_ msg: String) {
         errorText = msg
         showError = true
     }
 }
 
 #Preview {
-    AddGoalView().environmentObject(AppState())
+    AddGoalView()
+        .environmentObject(AppState())
 }
