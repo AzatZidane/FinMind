@@ -6,11 +6,13 @@ struct FinMindApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AddExpenseView()               // ← или BudgetView(), CalendarListView() и т. п.
+            RootView()
                 .environmentObject(app)
-                .onAppear { app.loadFromDiskIfAvailable() }
+                .onAppear {
+                    // загружаем сохранённое состояние, если есть
+                    app.loadFromDiskIfAvailable()
+                    // app.startAutoSave() — не нужно вызывать: оно уже запускается в init() AppState
+                }
         }
     }
 }
-
-
