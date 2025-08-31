@@ -2,16 +2,15 @@ import SwiftUI
 
 @main
 struct FinMindApp: App {
-    @StateObject private var appState: AppState = {
-        let loaded = Persistence.shared.load()
-        loaded.startAutoSave()
-        return loaded
-    }()
+    @StateObject private var app = AppState()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appState)
+            RootView()
+                .environmentObject(app)
+                .onAppear {
+                    app.loadFromDiskIfAvailable()   // этого достаточно
+                }
         }
     }
 }
