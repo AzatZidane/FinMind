@@ -16,16 +16,19 @@ struct AddGoalView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // --- Основная информация о цели
                 Section(header: Text("Цель")) {
                     TextField("Название", text: $name)
+                        .capWordsIfAvailable()
                     TextField("Сумма", text: $targetAmount)
-                        .keyboardType(.decimalPad)
+                        .decimalKeyboardIfAvailable()
                     DatePicker("Дедлайн", selection: $deadline, displayedComponents: .date)
                     Stepper(value: $priority, in: 1...3) {
                         Text("Приоритет: \(priority)")
                     }
                 }
 
+                // --- Примечание (в UI оставим, но в модель не передаём, т.к. у Goal нет параметра note)
                 Section(header: Text("Примечание")) {
                     TextField("Опционально", text: $note)
                 }
@@ -47,24 +50,28 @@ struct AddGoalView: View {
         }
     }
 
+    // MARK: - Сохранение
+
     private func save() {
+        // Валидация суммы
         guard let amt = Double(targetAmount.replacingOccurrences(of: ",", with: ".")), amt > 0 else {
             showValidation("Введите корректную сумму (> 0)")
             return
         }
-
+        // Валидация названия
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             showValidation("Введите название")
             return
         }
 
+        // Инициализатор Goal у тебя без параметра note:, поэтому не передаём его
         let goal = Goal(
             name: name,
             targetAmount: amt,
             deadline: deadline,
-            priority: priority,
-            note: note.isEmpty ? nil : note
+            priority: priority
         )
+
         app.addGoal(goal)
         dismiss()
     }
@@ -72,6 +79,31 @@ struct AddGoalView: View {
     private func showValidation(_ msg: String) {
         errorText = msg
         showError = true
+    }
+}
+
+// MARK: - Платформенно‑безопасные модификаторы
+private extension View {
+    @ViewBuilder
+    func capWordsIfAvailable() -> some View {
+        #if canImport(UIKit)
+        if #available(iOS 15.0, *) {
+            self.textInputAutocapitalization(.words)
+        } else {
+            self.autocapitalization(.words)
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func decimalKeyboardIfAvailable() -> some View {
+        #if canImport(UIKit)
+        self.keyboardType(.decimalPad)
+        #else
+        self
+        #endif
     }
 }
 
