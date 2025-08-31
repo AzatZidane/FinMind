@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Безопасные модификаторы: на iOS работают, на macOS/старых SDK — игнорируются.
+// Общие безопасные модификаторы: на iOS применяются, на macOS/старых SDK игнорируются.
 extension View {
     @ViewBuilder
     func decimalKeyboardIfAvailable() -> some View {

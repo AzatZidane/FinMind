@@ -6,7 +6,7 @@ struct AddDebtView: View {
 
     enum Mode: String, CaseIterable, Identifiable {
         case monthly = "Ежемесячный платёж"
-        case loan = "Параметры кредита"
+        case loan    = "Параметры кредита"
         var id: String { rawValue }
     }
 
@@ -45,7 +45,6 @@ struct AddDebtView: View {
                 if mode == .monthly {
                     Section {
                         TextField("Название", text: $monthlyName)
-                            .capWordsIfAvailable()
                         TextField("Сумма", text: $monthlyAmount)
                             .decimalKeyboardIfAvailable()
                         Toggle("Минимальный платёж", isOn: $isMinimum)
@@ -55,7 +54,6 @@ struct AddDebtView: View {
                 } else {
                     Section {
                         TextField("Название", text: $loanName)
-                            .capWordsIfAvailable()
                         TextField("Сумма кредита", text: $principal)
                             .decimalKeyboardIfAvailable()
                         TextField("Ставка APR, %", text: $apr)
@@ -141,28 +139,6 @@ struct AddDebtView: View {
     private func showError(_ msg: String) {
         errorText = msg
         showError = true
-    }
-}
-
-// Платформенно‑безопасные модификаторы (на iOS работают, на macOS/старых SDK — игнорируются)
-private 
-
-    @ViewBuilder
-    func decimalKeyboardIfAvailable() -> some View {
-        #if canImport(UIKit)
-        self.keyboardType(.decimalPad)
-        #else
-        self
-        #endif
-    }
-
-    @ViewBuilder
-    func numberKeyboardIfAvailable() -> some View {
-        #if canImport(UIKit)
-        self.keyboardType(.numberPad)
-        #else
-        self
-        #endif
     }
 }
 
