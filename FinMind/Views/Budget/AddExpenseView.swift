@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct AddExpenseView: View {
@@ -34,8 +33,9 @@ struct AddExpenseView: View {
                 // --- Секция 1: описание
                 Section(header: Text("Описание")) {
                     TextField("Название", text: $name)
+                        .capWordsIfAvailable()            // iOS: автокапитализация слов
                     TextField("Сумма", text: $amount)
-                        .keyboardType(.decimalPad)
+                        .decimalKeyboardIfAvailable()     // iOS: цифровая клавиатура
                     Picker("Категория", selection: $category) {
                         ForEach(ExpenseCategory.allCases, id: \.self) { c in
                             Text(c.rawValue).tag(c)
@@ -43,11 +43,12 @@ struct AddExpenseView: View {
                     }
                 }
 
-                // --- Секция 2: повторяющийся
-                Section(header: Text("Повторяющийся расход")) {
+                // --- Секция 2: тип расхода
+                Section(header: Text("Тип")) {
                     Toggle("Повторяющийся расход", isOn: $isRecurring)
                 }
 
+                // --- Секция 3: параметры в зависимости от типа
                 if isRecurring {
                     Section(header: Text("Параметры повтора")) {
                         Picker("Периодичность", selection: $periodicity) {
@@ -69,6 +70,7 @@ struct AddExpenseView: View {
                     }
                 }
 
+                // --- Секция 4: примечание
                 Section(header: Text("Примечание")) {
                     TextField("Опционально", text: $note)
                 }
@@ -90,18 +92,25 @@ struct AddExpenseView: View {
         }
     }
 
+    // MARK: - Сохранение
+
     private func save() {
+        // Валидация суммы
         guard let amt = Double(amount.replacingOccurrences(of: ",", with: ".")), amt > 0 else {
             showValidation("Введите корректную сумму (> 0)")
             return
         }
-
+        // Валидация названия
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             showValidation("Введите название")
             return
         }
 
         if isRecurring {
+            if hasEndDate && endDate < startDate {
+                showValidation("Дата окончания не может быть раньше даты начала")
+                return
+            }
             let end: Date? = hasEndDate ? endDate : nil
             let exp = Expense(
                 name: name,
@@ -112,6 +121,10 @@ struct AddExpenseView: View {
             )
             app.addExpense(exp)
         } else {
+            if !planned && oneOffDate > Date() {
+                showValidation("Фактический разовый расход не может быть в будущем")
+                return
+            }
             let exp = Expense(
                 name: name,
                 amount: amt,
@@ -128,6 +141,31 @@ struct AddExpenseView: View {
     private func showValidation(_ msg: String) {
         errorText = msg
         showError = true
+    }
+}
+
+// MARK: - Платформенно‑безопасные модификаторы (для iOS ок, на macOS — игнорируются)
+private extension View {
+    @ViewBuilder
+    func capWordsIfAvailable() -> some View {
+        #if canImport(UIKit)
+        if #available(iOS 15.0, *) {
+            self.textInputAutocapitalization(.words)
+        } else {
+            self.autocapitalization(.words)
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func decimalKeyboardIfAvailable() -> some View {
+        #if canImport(UIKit)
+        self.keyboardType(.decimalPad)
+        #else
+        self
+        #endif
     }
 }
 
