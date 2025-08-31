@@ -6,12 +6,11 @@ struct FinMindApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            AddExpenseView()               // ← или BudgetView(), CalendarListView() и т. п.
                 .environmentObject(app)
-                .onAppear {
-                    app.loadFromDiskIfAvailable()   // этого достаточно
-                }
+                .onAppear { app.loadFromDiskIfAvailable() }
         }
     }
 }
+
 

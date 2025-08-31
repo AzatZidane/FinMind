@@ -2,140 +2,143 @@ import SwiftUI
 
 struct CalendarListView: View {
     @EnvironmentObject var app: AppState
-    @State private var presentAdd = false
-    
-    var grouped: [(Date, [DailyEntry])] {
-        let grouped = Dictionary(grouping: app.dailyEntries) { $0.date.startOfMonth() }
-        let sorted = grouped.sorted { $0.key < $1.key }
-        return sorted
-    }
-    
-    var body: some View {
-        List {
-            ForEach(grouped, id: \.0) { (month, items) in
-                Section(month.formatted(Date.FormatStyle().month(.wide).year())) {
-                    ForEach(items.sorted(by: { $0.date < $1.date })) { e in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(e.type.rawValue): \(e.name)")
-                                    .font(.headline)
-                                Text("\(e.planned ? "План" : "Факт") • \(e.date.formatted(date: .abbreviated, time: .omitted))\(e.category != nil ? " • \(e.category!.rawValue)" : "")")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(e.amount.moneyString).font(.body.monospacedDigit())
-                        }
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                app.removeDailyEntry(e)
-                            } label: {
-                                Label("Удалить", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Календарь")
-        .toolbar {
-            Button {
-                presentAdd = true
-            } label: {
-                Image(systemName: "plus")
-            }
-        }
-        .sheet(isPresented: $presentAdd) {
-            AddDailyEntryView().environmentObject(app)
-        }
-    }
-}
 
-struct AddDailyEntryView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var app: AppState
-    
-    @State private var date: Date = Date()
-    @State private var type: EntryType = .expense
-    @State private var name: String = ""
-    @State private var amount: String = ""
-    @State private var planned: Bool = true
-    @State private var category: ExpenseCategory = .other
-    
-    @State private var showError = false
-    @State private var errorText = ""
-    
+    // Поиск + фильтр по сумме
+    @State private var query: String = ""
+    @State private var minAmountText: String = ""
+
+    // MARK: - Парсинг минимальной суммы
+    private var minAmount: Double? {
+        let normalized = minAmountText.replacingOccurrences(of: ",", with: ".")
+        return Double(normalized)
+    }
+
+    // MARK: - Отфильтрованные данные (разбиваем логику на простые шаги)
+    private var filteredIncomes: [Income] {
+        var items = app.incomes
+
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !q.isEmpty {
+            items = items.filter { $0.name.lowercased().contains(q) }
+        }
+        if let min = minAmount {
+            items = items.filter { $0.amount >= min }
+        }
+        // при желании можно отсортировать, например по имени:
+        // items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        return items
+    }
+
+    private var filteredExpenses: [Expense] {
+        var items = app.expenses
+
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !q.isEmpty {
+            items = items.filter { $0.name.lowercased().contains(q) }
+        }
+        if let min = minAmount {
+            items = items.filter { $0.amount >= min }
+        }
+        return items
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                DatePicker("Дата", selection: $date, displayedComponents: .date)
-                Picker("Тип", selection: $type) {
-                    ForEach(EntryType.allCases) { t in
-                        Text(t.rawValue).tag(t)
+            VStack(spacing: 12) {
+                // Панель фильтров
+                filterBar
+
+                // Список
+                List {
+                    if !filteredIncomes.isEmpty {
+                        Section("Доходы") {
+                            ForEach(Array(filteredIncomes.enumerated()), id: \.offset) { _, income in
+                                incomeRow(income)
+                            }
+                        }
                     }
-                }
-                TextField("Название", text: $name)
-                TextField("Сумма", text: $amount).keyboardType(.decimalPad)
-                
-                if type == .expense {
-                    Picker("Категория", selection: $category) {
-                        ForEach(ExpenseCategory.allCases) { c in
-                            Text(c.rawValue).tag(c)
+
+                    if !filteredExpenses.isEmpty {
+                        Section("Расходы") {
+                            ForEach(Array(filteredExpenses.enumerated()), id: \.offset) { _, expense in
+                                expenseRow(expense)
+                            }
+                        }
+                    }
+
+                    if filteredIncomes.isEmpty && filteredExpenses.isEmpty {
+                        Section {
+                            Text("Ничего не найдено")
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
-                
-                Toggle("Плановый", isOn: $planned)
+                .listStyle(.insetGrouped)
             }
-            .navigationTitle("Новая запись")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") { save() }
-                }
-            }
-            .alert("Ошибка", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorText)
-            }
+            .padding(.top, 8)
+            .navigationTitle("Календарь")
         }
     }
-    
-    private func save() {
-        guard let amt = Double(amount.replacingOccurrences(of: ",", with: ".")), amt > 0 else {
-            showError("Введите корректную сумму (> 0)")
-            return
+
+    // MARK: - Вью: Панель фильтров
+    private var filterBar: some View {
+        VStack(spacing: 8) {
+            // Поиск по названию
+            TextField("Поиск по названию…", text: $query)
+                .textFieldStyle(.roundedBorder)
+
+            // Фильтр по минимальной сумме
+            HStack {
+                TextField("Мин. сумма", text: $minAmountText)
+                    .textFieldStyle(.roundedBorder)
+                #if canImport(UIKit)
+                    .keyboardType(.decimalPad)   // на iOS появится цифровая клавиатура
+                #endif
+
+                if let min = minAmount {
+                    Text("≥ \(min, specifier: "%.2f")")
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
-            showError("Введите название")
-            return
-        }
-        if !planned && date > Date() {
-            showError("Фактическая запись не может быть в будущем")
-            return
-        }
-        
-        if type == .expense {
-            let entry = DailyEntry(date: date, type: .expense, name: name, amount: amt, category: category, planned: planned)
-            app.addDailyEntry(entry)
-        } else {
-            let entry = DailyEntry(date: date, type: .income, name: name, amount: amt, category: nil, planned: planned)
-            app.addDailyEntry(entry)
-        }
-        dismiss()
+        .padding(.horizontal, 16)
     }
-    
-    private func showError(_ msg: String) {
-        errorText = msg
-        showError = true
+
+    // MARK: - Вью: строки списка
+    @ViewBuilder
+    private func incomeRow(_ inc: Income) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(inc.name)
+                    .font(.body)
+                Text("Доход")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("\(inc.amount, specifier: "%.2f")")
+                .font(.headline.monospacedDigit())
+        }
+    }
+
+    @ViewBuilder
+    private func expenseRow(_ exp: Expense) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(exp.name)
+                    .font(.body)
+                Text("Расход")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("\(exp.amount, specifier: "%.2f")")
+                .font(.headline.monospacedDigit())
+        }
     }
 }
 
 #Preview {
-    NavigationStack {
-        CalendarListView().environmentObject(AppState())
-    }
+    CalendarListView()
+        .environmentObject(AppState())
 }
