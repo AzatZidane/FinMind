@@ -3,17 +3,21 @@ import SwiftUI
 struct RootView: View {
     var body: some View {
         TabView {
+            // 1. Бюджет
             BudgetView()
-                .tabItem { Label("Бюджет", systemImage: "chart.pie.fill") }
+                .tabItem { Label(UIStrings.tab1, systemImage: "chart.pie.fill") }
 
-            CalendarListView()
-                .tabItem { Label("Календарь", systemImage: "calendar") }
-
+            // 2. План (используем экран целей как «план»)
             GoalsListView()
-                .tabItem { Label("Цели", systemImage: "target") }
+                .tabItem { Label(UIStrings.tab2, systemImage: "list.bullet.rectangle") }
 
-            DebtsListView()
-                .tabItem { Label("Долги", systemImage: "creditcard") }
+            // 3. Советник (новый экран‑заглушка с действиями)
+            AdvisorView()
+                .tabItem { Label(UIStrings.tab3, systemImage: "lightbulb") }
+
+            // 4. Профиль (настройки/сброс)
+            SettingsView()
+                .tabItem { Label(UIStrings.tab4, systemImage: "person.circle") }
         }
     }
 }
