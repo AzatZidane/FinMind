@@ -3,20 +3,20 @@ import SwiftUI
 struct AddDebtView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var app: AppState
-    
+
     enum Mode: String, CaseIterable, Identifiable {
         case monthly = "Ежемесячный платёж"
         case loan = "Параметры кредита"
         var id: String { rawValue }
     }
-    
+
     @State private var mode: Mode = .monthly
-    
+
     // Monthly payment mode
     @State private var monthlyName: String = ""
     @State private var monthlyAmount: String = ""
     @State private var isMinimum: Bool = true
-    
+
     // Loan mode
     @State private var loanName: String = ""
     @State private var principal: String = ""
@@ -24,34 +24,50 @@ struct AddDebtView: View {
     @State private var termMonths: String = ""
     @State private var graceMonths: String = ""
     @State private var minPayment: String = ""
-    
+
     @State private var showError = false
     @State private var errorText = ""
-    
+
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Режим", selection: $mode) {
-                    ForEach(Mode.allCases) { m in
-                        Text(m.rawValue).tag(m)
+                Section {
+                    Picker("Режим", selection: $mode) {
+                        ForEach(Mode.allCases) { m in
+                            Text(m.rawValue).tag(m as Mode)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Тип долга")
                 }
-                .pickerStyle(.segmented)
-                
+
                 if mode == .monthly {
-                    Section("Ежемесячный платёж") {
+                    Section {
                         TextField("Название", text: $monthlyName)
-                        TextField("Сумма", text: $monthlyAmount).keyboardType(.decimalPad)
+                            .capWordsIfAvailable()
+                        TextField("Сумма", text: $monthlyAmount)
+                            .decimalKeyboardIfAvailable()
                         Toggle("Минимальный платёж", isOn: $isMinimum)
+                    } header: {
+                        Text("Ежемесячный платёж")
                     }
                 } else {
-                    Section("Параметры кредита") {
+                    Section {
                         TextField("Название", text: $loanName)
-                        TextField("Сумма кредита", text: $principal).keyboardType(.decimalPad)
-                        TextField("Ставка APR, %", text: $apr).keyboardType(.decimalPad)
-                        TextField("Срок, месяцев", text: $termMonths).keyboardType(.numberPad)
-                        TextField("Грейс-период, мес (опц.)", text: $graceMonths).keyboardType(.numberPad)
-                        TextField("Мин. платёж (опц.)", text: $minPayment).keyboardType(.decimalPad)
+                            .capWordsIfAvailable()
+                        TextField("Сумма кредита", text: $principal)
+                            .decimalKeyboardIfAvailable()
+                        TextField("Ставка APR, %", text: $apr)
+                            .decimalKeyboardIfAvailable()
+                        TextField("Срок, месяцев", text: $termMonths)
+                            .numberKeyboardIfAvailable()
+                        TextField("Грейс-период, мес (опц.)", text: $graceMonths)
+                            .numberKeyboardIfAvailable()
+                        TextField("Мин. платёж (опц.)", text: $minPayment)
+                            .decimalKeyboardIfAvailable()
+                    } header: {
+                        Text("Параметры кредита")
                     }
                 }
             }
@@ -71,7 +87,7 @@ struct AddDebtView: View {
             }
         }
     }
-    
+
     private func save() {
         switch mode {
         case .monthly:
@@ -85,6 +101,7 @@ struct AddDebtView: View {
             }
             let d = Debt(name: monthlyName, input: .monthlyPayment(amount: amt, isMinimum: isMinimum))
             app.addDebt(d)
+
         case .loan:
             guard let p = Double(principal.replacingOccurrences(of: ",", with: ".")), p > 0 else {
                 showError("Введите корректную сумму кредита")
@@ -98,22 +115,66 @@ struct AddDebtView: View {
                 showError("Введите срок в месяцах (> 0)")
                 return
             }
-            let grace = Int(graceMonths)
-            let min = Double(minPayment.replacingOccurrences(of: ",", with: "."))
+            let grace = Int(graceMonths) // опционально
+            let min = Double(minPayment.replacingOccurrences(of: ",", with: ".")) // опционально
+
             guard !loanName.trimmingCharacters(in: .whitespaces).isEmpty else {
                 showError("Введите название")
                 return
             }
-            let d = Debt(name: loanName, input: .loan(principal: p, apr: a, termMonths: t, graceMonths: grace, minPayment: min))
+            let d = Debt(
+                name: loanName,
+                input: .loan(
+                    principal: p,
+                    apr: a,
+                    termMonths: t,
+                    graceMonths: grace,
+                    minPayment: min
+                )
+            )
             app.addDebt(d)
         }
-        
+
         dismiss()
     }
-    
+
     private func showError(_ msg: String) {
         errorText = msg
         showError = true
+    }
+}
+
+// Платформенно‑безопасные модификаторы (на iOS работают, на macOS/старых SDK — игнорируются)
+private extension View {
+    @ViewBuilder
+    func capWordsIfAvailable() -> some View {
+        #if canImport(UIKit)
+        if #available(iOS 15.0, *) {
+            self.textInputAutocapitalization(.words)
+        } else {
+            self.autocapitalization(.words)
+        }
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func decimalKeyboardIfAvailable() -> some View {
+        #if canImport(UIKit)
+        self.keyboardType(.decimalPad)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func numberKeyboardIfAvailable() -> some View {
+        #if canImport(UIKit)
+        self.keyboardType(.numberPad)
+        #else
+        self
+        #endif
     }
 }
 
