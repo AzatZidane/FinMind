@@ -23,7 +23,7 @@ struct AddIncomeView: View {
     // Разовый доход
     @State private var oneOffDate: Date = Date()
 
-    // Ошибки
+    // Ошибки/валидация
     @State private var showError: Bool = false
     @State private var errorText: String = ""
 
@@ -31,19 +31,17 @@ struct AddIncomeView: View {
         NavigationStack {
             Form {
                 // --- Секция 1: описание
-                Section {
+                Section(header: Text("Описание")) {
                     TextField("Название", text: $name)
-                        .capWordsIfAvailable()          // безопасная автокапитализация на iOS
+                        .capWordsIfAvailable()
                     TextField("Сумма", text: $amount)
-                        .decimalKeyboardIfAvailable()   // безопасная цифровая клавиатура на iOS
+                        .decimalKeyboardIfAvailable()
                     Toggle("Постоянный доход", isOn: $isRecurring)
-                } header: {
-                    Text("Описание")
                 }
 
-                // --- Секция 2: параметры
+                // --- Секция 2: параметры в зависимости от типа
                 if isRecurring {
-                    Section {
+                    Section(header: Text("Параметры постоянного дохода")) {
                         Picker("Периодичность", selection: $periodicity) {
                             ForEach(Periodicity.allCases, id: \.self) { p in
                                 Text(p.rawValue).tag(p as Periodicity)
@@ -57,23 +55,17 @@ struct AddIncomeView: View {
                         }
 
                         Toggle("Пометить как постоянный", isOn: $isPermanent)
-                    } header: {
-                        Text("Параметры постоянного дохода")
                     }
                 } else {
-                    Section {
+                    Section(header: Text("Разовый доход")) {
                         DatePicker("Дата", selection: $oneOffDate, displayedComponents: .date)
                         Toggle("Плановый (в будущем)", isOn: $planned)
-                    } header: {
-                        Text("Разовый доход")
                     }
                 }
 
                 // --- Секция 3: примечание
-                Section {
+                Section(header: Text("Дополнительно")) {
                     TextField("Примечание", text: $note)
-                } header: {
-                    Text("Дополнительно")
                 }
             }
             .navigationTitle("Новый доход")
@@ -93,16 +85,15 @@ struct AddIncomeView: View {
         }
     }
 
-    // MARK: - Сохранение
+    // MARK: - Логика сохранения
 
     private func save() {
-        // Валидация суммы
+        // Сумма
         guard let amt = Double(amount.replacingOccurrences(of: ",", with: ".")), amt > 0 else {
             showValidation("Введите корректную сумму (> 0)")
             return
         }
-        
-        // Валидация названия
+        // Название
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             showValidation("Введите название")
             return
@@ -112,7 +103,6 @@ struct AddIncomeView: View {
                         showValidation("Дата окончания не может быть раньше даты начала")
                         return
                     }
-
                     let end: Date? = hasEndDate ? endDate : nil
                     let inc = Income(
                         name: name,
@@ -131,7 +121,6 @@ struct AddIncomeView: View {
                         showValidation("Фактический разовый доход не может быть в будущем")
                         return
                     }
-
                     let inc = Income(
                         name: name,
                         amount: amt,
@@ -150,7 +139,7 @@ struct AddIncomeView: View {
             }
         }
 
-        // Платформенно‑безопасные модификаторы, чтобы не падать на macOS / старых iOS
+        // Платформенно‑безопасные модификаторы (чтобы не падать на macOS/старых iOS)
         private extension View {
             @ViewBuilder
             func capWordsIfAvailable() -> some View {
