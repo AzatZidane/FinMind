@@ -41,7 +41,7 @@ struct DebtsListView: View {
             }
             Spacer()
             if let amt = amount(for: d) {
-                Text("\(amt, specifier: "%.2f")")
+                Text(amt.asMoney)
                     .font(.headline.monospacedDigit())
             }
         }

@@ -39,7 +39,7 @@ struct GoalsListView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text("\(g.targetAmount, specifier: "%.2f")")
+            Text(g.targetAmount.asMoney)  // ← форматированная сумма
                 .font(.headline.monospacedDigit())
         }
     }
