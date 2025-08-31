@@ -73,7 +73,12 @@ struct CalendarListView: View {
                         }
                     }
                 }
-                .listStyle(.insetGrouped)
+                #if os(iOS)
+                    .listStyle(.insetGrouped)
+                #else
+                    .listStyle(.inset)       // или просто убери стиль на macOS
+                #endif
+
             }
             .padding(.top, 8)
             .navigationTitle("Календарь")

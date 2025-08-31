@@ -145,19 +145,7 @@ struct AddExpenseView: View {
 }
 
 // MARK: - Платформенно‑безопасные модификаторы (для iOS ок, на macOS — игнорируются)
-private extension View {
-    @ViewBuilder
-    func capWordsIfAvailable() -> some View {
-        #if canImport(UIKit)
-        if #available(iOS 15.0, *) {
-            self.textInputAutocapitalization(.words)
-        } else {
-            self.autocapitalization(.words)
-        }
-        #else
-        self
-        #endif
-    }
+private 
 
     @ViewBuilder
     func decimalKeyboardIfAvailable() -> some View {
