@@ -13,7 +13,10 @@ import SwiftUI
 final class AppState: ObservableObject, Codable {
 
     // MARK: - Публичные @Published-данные
-
+    func forceSave() {
+        Persistence.shared.save(self) // или твой существующий способ сохранения
+    }
+    
     @Published var incomes: [Income] = []
     @Published var expenses: [Expense] = []
     @Published var debts: [Debt] = []
