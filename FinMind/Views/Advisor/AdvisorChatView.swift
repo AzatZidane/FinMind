@@ -62,34 +62,26 @@ final class ChatVM: ObservableObject {
 
     private let service = OpenAIChatService()
 
-    /// Собираем system-prompt из AppState
     private func systemMessage(app: AppState) -> ChatMessage {
         var text = "Вы — финансовый помощник. Вот данные пользователя:\n"
 
         if !app.incomes.isEmpty {
             text += "\nДоходы:"
-            for i in app.incomes {
-                text += "\n- \(i.name): \(i.amount)"
-            }
+            for i in app.incomes { text += "\n- \(i.name): \(i.amount)" }
         }
         if !app.expenses.isEmpty {
             text += "\nРасходы:"
-            for e in app.expenses {
-                text += "\n- \(e.name): \(e.amount)"
-            }
+            for e in app.expenses { text += "\n- \(e.name): \(e.amount)" }
         }
         if !app.debts.isEmpty {
             text += "\nДолги:"
-            for d in app.debts {
-                text += "\n- \(d.name)"
-            }
+            for d in app.debts { text += "\n- \(d.name)" }
         }
         if !app.goals.isEmpty {
             text += "\nЦели:"
-            for g in app.goals {
-                text += "\n- \(g.name): \(g.targetAmount)"
-            }
+            for g in app.goals { text += "\n- \(g.name): \(g.targetAmount)" }
         }
+
         return .init(role: .system, content: text)
     }
 
@@ -100,8 +92,6 @@ final class ChatVM: ObservableObject {
         input = ""
 
         let userMsg = ChatMessage(role: .user, content: text)
-
-        // полный контекст: system (данные) + история + новый вопрос
         var context: [ChatMessage] = [systemMessage(app: app)] + messages + [userMsg]
         messages.append(userMsg)
 

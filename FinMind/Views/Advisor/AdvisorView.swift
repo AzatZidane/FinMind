@@ -1,5 +1,33 @@
 import SwiftUI
 
+
+
+struct AdvisorView: View {
+    @EnvironmentObject var app: AppState
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Чат с GPT") {
+                    NavigationLink("Открыть чат") {
+                        AdvisorChatView().environmentObject(app)
+                    }
+                }
+
+                // остальные секции: 50/30/20, Подушка, Долги...
+                plan503020Section
+                cushionSection
+                debtsAdviceSection
+            }
+            .navigationTitle(UIStrings.tab3)
+        }
+    }
+
+    // остальной код (plan503020Section, cushionSection, debtsAdviceSection) оставь как есть
+}
+
+
+
 struct AdvisorView: View {
     @EnvironmentObject var app: AppState
 
