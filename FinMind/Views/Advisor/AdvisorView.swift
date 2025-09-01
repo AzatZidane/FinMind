@@ -1,33 +1,5 @@
 import SwiftUI
 
-
-
-struct AdvisorView: View {
-    @EnvironmentObject var app: AppState
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Чат с GPT") {
-                    NavigationLink("Открыть чат") {
-                        AdvisorChatView().environmentObject(app)
-                    }
-                }
-
-                // остальные секции: 50/30/20, Подушка, Долги...
-                plan503020Section
-                cushionSection
-                debtsAdviceSection
-            }
-            .navigationTitle(UIStrings.tab3)
-        }
-    }
-
-    // остальной код (plan503020Section, cushionSection, debtsAdviceSection) оставь как есть
-}
-
-
-
 struct AdvisorView: View {
     @EnvironmentObject var app: AppState
 
@@ -39,11 +11,7 @@ struct AdvisorView: View {
     var body: some View {
         NavigationStack {
             List {
-                // ← ВХОД В ЧАТ GPT
-                Section("Чат с GPT") {
-                    NavigationLink("Начать чат с ИИ помощником") { AdvisorChatView() }
-                }
-
+                chatSection
                 plan503020Section
                 cushionSection
                 debtsAdviceSection
@@ -53,11 +21,24 @@ struct AdvisorView: View {
     }
 }
 
-// MARK: - 50/30/20
+// MARK: - Раздел «Чат с GPT»
+
+private extension AdvisorView {
+    var chatSection: some View {
+        Section(header: Text("Чат с GPT")) {
+            NavigationLink(
+                destination: AdvisorChatView().environmentObject(app),
+                label: { Text("Открыть чат") }
+            )
+        }
+    }
+}
+
+// MARK: - Раздел «План 50/30/20»
 
 private extension AdvisorView {
     var plan503020Section: some View {
-        Section("План 50/30/20") {
+        Section(header: Text("План 50/30/20")) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Разделите чистый ежемесячный доход на 50% обязательные, 30% желательные, 20% накопления.")
                     .font(.footnote)
@@ -69,7 +50,8 @@ private extension AdvisorView {
                         .decimalKeyboardIfAvailable()
                     if let inc = parseMoney(monthlyIncomeText) {
                         Text(inc.asMoney)
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -81,18 +63,19 @@ private extension AdvisorView {
                     LabeledContent("Желательные") { Text(wants.asMoney) }
                     LabeledContent("Накопления")  { Text(saving.asMoney) }
                 } else {
-                    Text("Введите сумму дохода, чтобы увидеть расчёт.").foregroundStyle(.secondary)
+                    Text("Введите сумму дохода, чтобы увидеть расчёт.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
     }
 }
 
-// MARK: - Финансовая подушка
+// MARK: - Раздел «Финансовая подушка»
 
 private extension AdvisorView {
     var cushionSection: some View {
-        Section("Финансовая подушка") {
+        Section(header: Text("Финансовая подушка")) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Цель — покрыть расходы на N месяцев без дохода.")
                     .font(.footnote)
@@ -119,18 +102,19 @@ private extension AdvisorView {
                     let goal = spend * Double(cushionMonths)
                     LabeledContent("Цель подушки") { Text(goal.asMoney) }
                 } else {
-                    Text("Введите ежемесячные расходы, чтобы увидеть цель.").foregroundStyle(.secondary)
+                    Text("Введите ежемесячные расходы, чтобы увидеть цель.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
     }
 }
 
-// MARK: - Приоритет погашения долгов
+// MARK: - Раздел «Приоритет погашения долгов»
 
 private extension AdvisorView {
     var debtsAdviceSection: some View {
-        Section("Приоритет погашения долгов") {
+        Section(header: Text("Приоритет погашения долгов")) {
             if debtInfos.isEmpty {
                 Text("Долгов пока нет. Добавьте их на вкладке «Долги».")
                     .foregroundStyle(.secondary)
@@ -209,7 +193,9 @@ private extension AdvisorView {
 
 private extension AdvisorView {
     func parseMoney(_ s: String) -> Double? {
-        let normalized = s.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: ",", with: ".")
+        let normalized = s
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ",", with: ".")
         return Double(normalized)
     }
 }
