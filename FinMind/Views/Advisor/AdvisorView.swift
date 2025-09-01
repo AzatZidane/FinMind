@@ -11,9 +11,11 @@ struct AdvisorView: View {
     var body: some View {
         NavigationStack {
             List {
+                // ← ВХОД В ЧАТ GPT
                 Section("Чат с GPT") {
                     NavigationLink("Открыть чат") { AdvisorChatView() }
                 }
+
                 plan503020Section
                 cushionSection
                 debtsAdviceSection
@@ -29,7 +31,7 @@ private extension AdvisorView {
     var plan503020Section: some View {
         Section("План 50/30/20") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Разделите чистый ежемесячный доход на три корзины: 50% — обязательные, 30% — желательные, 20% — накопления.")
+                Text("Разделите чистый ежемесячный доход на 50% обязательные, 30% желательные, 20% накопления.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -102,20 +104,19 @@ private extension AdvisorView {
     var debtsAdviceSection: some View {
         Section("Приоритет погашения долгов") {
             if debtInfos.isEmpty {
-                Text("Долгов в разделе пока нет. Добавьте их на вкладке «Долги».")
+                Text("Долгов пока нет. Добавьте их на вкладке «Долги».")
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Две популярные стратегии:")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    Text("• Аваланш — сначала самый высокий % APR (минимальная переплата).")
+                    Text("Две стратегии:").font(.footnote).foregroundStyle(.secondary)
+                    Text("• Аваланш — сначала самый высокий APR (минимальная переплата).")
                         .font(.footnote).foregroundStyle(.secondary)
                     Text("• Сноуболл — сначала самая маленькая сумма (быстрые победы).")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
                 if !avalancheOrder.isEmpty {
-                    Text("Аваланш (по ставке APR):").font(.subheadline).padding(.top, 4)
+                    Text("Аваланш (по APR):").font(.subheadline).padding(.top, 4)
                     ForEach(Array(avalancheOrder.enumerated()), id: \.offset) { idx, d in
                         HStack {
                             Text("\(idx + 1). \(d.name)")
@@ -141,14 +142,12 @@ private extension AdvisorView {
         }
     }
 
-    // Представление долга с нужными полями
     struct DebtInfo {
         let name: String
-        let baseAmount: Double   // principal для кредита или сумма платежа для monthly
-        let apr: Double?         // только для кредита
+        let baseAmount: Double
+        let apr: Double?
     }
 
-    // Извлекаем инфо из app.debts
     var debtInfos: [DebtInfo] {
         app.debts.map { d in
             switch d.input {
@@ -160,7 +159,6 @@ private extension AdvisorView {
         }
     }
 
-    // Аваланш — по APR (nil в конец), при равной ставке — по сумме убыв.
     var avalancheOrder: [DebtInfo] {
         debtInfos.sorted { a, b in
             switch (a.apr, b.apr) {
@@ -174,7 +172,6 @@ private extension AdvisorView {
         }
     }
 
-    // Сноуболл — по сумме возр.
     var snowballOrder: [DebtInfo] {
         debtInfos.sorted { $0.baseAmount < $1.baseAmount }
     }
@@ -183,11 +180,12 @@ private extension AdvisorView {
 // MARK: - Вспомогательное
 
 private extension AdvisorView {
-    /// Парсинг денег вида "1 234,56" / "1234.56" → Double
     func parseMoney(_ s: String) -> Double? {
-        let normalized = s
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: ",", with: ".")
+        let normalized = s.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: ",", with: ".")
         return Double(normalized)
     }
+}
+
+#Preview {
+    AdvisorView().environmentObject(AppState())
 }
