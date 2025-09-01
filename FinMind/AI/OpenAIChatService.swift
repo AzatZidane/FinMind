@@ -6,7 +6,7 @@ struct ChatMessage: Codable { let role: ChatRole; let content: String }
 enum OpenAIKeyError: LocalizedError {
     case missing
     var errorDescription: String? {
-        "OpenAI API key is missing. Set OPENAI_API_KEY env var or add it to Keychain (service=OpenAI, account=default)."
+        "OPENAI_API_KEY не найден. Задайте переменную окружения в схеме Xcode (Edit Scheme → Run → Environment Variables)."
     }
 }
 
@@ -16,43 +16,40 @@ final class OpenAIChatService {
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
 
     private func apiKey() throws -> String {
-        if let env = ProcessInfo.processInfo.environment["***REMOVED***"], !env.isEmpty {
-            return env
-        }
-        if let key = try? KeychainHelper.shared.read(service: "OpenAI", account: "default"), !key.isEmpty {
-            return key
-        }
+        if let k = ProcessInfo.processInfo.environment["OPENAI_API_KEY"], !k.isEmpty { return k }
         throw OpenAIKeyError.missing
     }
 
+    // Нестримоый ответ
     func complete(messages: [ChatMessage]) async throws -> String {
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(try apiKey())", forHTTPHeaderField: "Authorization")
-
-        let body = ChatCreateRequest(model: model, messages: messages, temperature: temperature, stream: nil)
-        req.httpBody = try JSONEncoder().encode(body)
-
+        req.httpBody = try JSONEncoder().encode(ChatCreateRequest(
+            model: model, messages: messages, temperature: temperature, stream: nil
+        ))
         let (data, resp) = try await URLSession.shared.data(for: req)
-        try validateHTTP(resp)
+        try validate(resp)
         let decoded = try JSONDecoder().decode(ChatCreateResponse.self, from: data)
         return decoded.choices.first?.message.content ?? ""
     }
 
+    // Стриминг по SSE (опционально — можно не использовать)
     func stream(messages: [ChatMessage],
                 onDelta: @escaping (String) -> Void,
-                onFinish: @escaping () -> Void) async throws {
+                onFinish: @escaping () -> Void) async throws
+    {
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(try apiKey())", forHTTPHeaderField: "Authorization")
-
-        let body = ChatCreateRequest(model: model, messages: messages, temperature: temperature, stream: true)
-        req.httpBody = try JSONEncoder().encode(body)
+        req.httpBody = try JSONEncoder().encode(ChatCreateRequest(
+            model: model, messages: messages, temperature: temperature, stream: true
+        ))
 
         let (bytes, resp) = try await URLSession.shared.bytes(for: req)
-        try validateHTTP(resp)
+        try validate(resp)
 
         for try await line in bytes.lines {
             guard line.hasPrefix("data: ") else { continue }
@@ -67,7 +64,7 @@ final class OpenAIChatService {
         onFinish()
     }
 
-    private func validateHTTP(_ resp: URLResponse) throws {
+    private func validate(_ resp: URLResponse) throws {
         if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw NSError(domain: "OpenAI", code: http.statusCode,
                           userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
@@ -75,14 +72,13 @@ final class OpenAIChatService {
     }
 }
 
-// --- DTO ниже без изменений ---
+// DTO под Chat Completions
 private struct ChatCreateRequest: Codable {
     let model: String
     let messages: [ChatMessage]
     let temperature: Double?
     let stream: Bool?
 }
-
 private struct ChatCreateResponse: Codable {
     struct Choice: Codable {
         struct Message: Codable { let role: ChatRole; let content: String }
@@ -95,7 +91,6 @@ private struct ChatCreateResponse: Codable {
     let created: Int
     let choices: [Choice]
 }
-
 private struct ChatStreamChunk: Codable {
     struct Choice: Codable {
         struct Delta: Codable { let role: ChatRole?; let content: String? }
