@@ -1,6 +1,21 @@
 import Foundation
 import Combine
 
+extension AppState {
+    /// Мутирует текущий объект, подменяя его данные загруженными с диска (если есть).
+    func loadFromDiskIfAvailable() {
+        guard let loaded = try? Persistence.shared.load() else { return }
+        // перекачиваем значения в опубликованные свойства
+        incomes = loaded.incomes
+        expenses = loaded.expenses
+        debts = loaded.debts
+        goals = loaded.goals
+        dailyEntries = loaded.dailyEntries
+        firstUseAt = loaded.firstUseAt
+    }
+}
+
+
 final class AppState: ObservableObject, Codable {
     // MARK: - Данные
     @Published var incomes: [Income]
