@@ -31,14 +31,25 @@ struct AdvisorChatView: View {
 
                     Button {
                         Task { await vm.send(app: app) }
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                    }
+                    } label: { Image(systemName: "paperplane.fill") }
                     .disabled(vm.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStreaming)
                 }
                 .padding(12)
             }
             .navigationTitle("Чат с советником")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(role: .destructive) {
+                            vm.clearChat()
+                        } label: {
+                            Label("Новый чат", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
         }
     }
 
@@ -48,22 +59,35 @@ struct AdvisorChatView: View {
             if m.role == .assistant { Spacer() }
             Text(m.content)
                 .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10)
-                    .fill(m.role == .assistant ? Color.secondary.opacity(0.15) : Color.accentColor.opacity(0.15)))
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(m.role == .assistant ? Color.secondary.opacity(0.15)
+                                                   : Color.accentColor.opacity(0.15))
+                )
             if m.role == .user { Spacer() }
         }
     }
 }
 
+// MARK: - ViewModel
+
 final class ChatVM: ObservableObject {
-    @Published var messages: [ChatMessage] = []
+    @Published var messages: [ChatMessage]
     @Published var input = ""
     @Published var isStreaming = false
 
     private let service = OpenAIChatService()
+    private let storage = ChatStorage.shared
 
+    init() {
+        // Загружаем историю при создании
+        self.messages = storage.load()
+    }
+
+    /// Формируем system‑prompt из текущих данных пользователя
     private func systemMessage(app: AppState) -> ChatMessage {
-        var text = "Вы — финансовый помощник. Вот данные пользователя:\n"
+        var text = "Вы — финансовый помощник. Давайте рекомендации осторожно и без категоричных обещаний.\n"
+        text += "Вот текущие данные пользователя:\n"
 
         if !app.incomes.isEmpty {
             text += "\nДоходы:"
@@ -92,9 +116,13 @@ final class ChatVM: ObservableObject {
         input = ""
 
         let userMsg = ChatMessage(role: .user, content: text)
+
+        // Контекст = свежий system (с данными) + история + новый вопрос
         var context: [ChatMessage] = [systemMessage(app: app)] + messages + [userMsg]
+
         messages.append(userMsg)
 
+        // Пустой ответ ассистента (будем дописывать токенами)
         isStreaming = true
         messages.append(.init(role: .assistant, content: ""))
 
@@ -108,13 +136,24 @@ final class ChatVM: ObservableObject {
                     }
                 }
             }, onFinish: { [weak self] in
-                Task { @MainActor in self?.isStreaming = false }
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.isStreaming = false
+                    self.storage.save(self.messages)   // сохраняем историю после ответа
+                }
             })
         } catch {
             await MainActor.run {
                 self.isStreaming = false
                 self.messages.append(.init(role: .assistant, content: "Ошибка: \(error.localizedDescription)"))
+                self.storage.save(self.messages)
             }
         }
+    }
+
+    @MainActor
+    func clearChat() {
+        messages.removeAll()
+        storage.clear()
     }
 }
