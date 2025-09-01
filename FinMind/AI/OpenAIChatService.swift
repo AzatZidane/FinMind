@@ -21,7 +21,7 @@ final class OpenAIChatService {
 
     // --- ПРОКСИ (Render) ---
     private let useProxy = true
-    private let proxyURL = URL(string: "https://YOUR_PROXY_URL/v1/chat")! // ← замени на свой URL
+    private let proxyURL = URL(string: "https://finmind-proxy.onrender.com/v1/chat")!// ← замени на свой URL
     private let appToken: String = ProcessInfo.processInfo.environment["APP_TOKEN"] ?? ""
 
     // --- Прямой вызов OpenAI (если отключишь прокси) ---
