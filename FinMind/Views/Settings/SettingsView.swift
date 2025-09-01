@@ -2,43 +2,31 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-    @State private var confirmReset = false
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Профиль") {
-                    NavigationLink("Аккаунт") { Text("Данные профиля…") }
+                Section(header: Text("Профиль")) {
+                    // твои элементы профиля
+                    Text("Имя профиля (заглушка)")
                 }
 
-                Section("Данные") {
-                    HStack { Text("Доходов");  Spacer(); Text("\(app.incomes.count)") }
-                    HStack { Text("Расходов"); Spacer(); Text("\(app.expenses.count)") }
-                    HStack { Text("Долгов");   Spacer(); Text("\(app.debts.count)") }
-                    HStack { Text("Целей");    Spacer(); Text("\(app.goals.count)") }
+                Section(header: Text("Параметры")) {
+                    // твои параметры приложения
+                    Toggle("Автосохранение (всегда включено)", isOn: .constant(true))
+                        .disabled(true)
                 }
 
-                Section("Опасная зона") {
-                    Button(role: .destructive) {
-                        confirmReset = true
+                // НОВЫЙ раздел
+                Section(header: Text("Данные")) {
+                    NavigationLink {
+                        BackupView().environmentObject(app)
                     } label: {
-                        Text("Сбросить все данные")
+                        Label("Резервная копия", systemImage: "externaldrive.badge.icloud")
                     }
                 }
             }
-            .navigationTitle(UIStrings.tab4)
-            .alert("Удалить все данные?", isPresented: $confirmReset) {
-                Button("Отмена", role: .cancel) {}
-                Button("Сбросить", role: .destructive) {
-                    app.incomes.removeAll()
-                    app.expenses.removeAll()
-                    app.debts.removeAll()
-                    app.goals.removeAll()
-                    app.dailyEntries.removeAll()
-                }
-            } message: {
-                Text("Действие необратимо.")
-            }
+            .navigationTitle(UIStrings.tab4) // если у тебя другой заголовок — поставь свой
         }
     }
 }
