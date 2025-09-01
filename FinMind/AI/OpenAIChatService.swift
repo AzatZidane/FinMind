@@ -11,6 +11,7 @@ enum OpenAIKeyError: LocalizedError {
 }
 
 final class OpenAIChatService {
+    private let useProxy = true
     var model: String = "gpt-4o-mini"
     var temperature: Double = 0.2
 
@@ -62,6 +63,8 @@ final class OpenAIChatService {
 
     // MARK: - Request builder
     private func makeRequest(messages: [ChatMessage], stream: Bool) throws -> URLRequest {
+        print("URL:", url)
+        print("Headers:", req.allHTTPHeaderFields ?? [:])
         let url = useProxy ? proxyURL : openAIURL
         var req = URLRequest(url: url)
         req.httpMethod = "POST"

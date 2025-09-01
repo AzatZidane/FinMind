@@ -13,7 +13,7 @@ struct AdvisorView: View {
             List {
                 // ← ВХОД В ЧАТ GPT
                 Section("Чат с GPT") {
-                    NavigationLink("Открыть чат") { AdvisorChatView() }
+                    NavigationLink("Начать чат с ИИ помощником") { AdvisorChatView() }
                 }
 
                 plan503020Section
