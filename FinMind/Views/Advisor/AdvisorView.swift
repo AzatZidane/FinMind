@@ -11,6 +11,9 @@ struct AdvisorView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("Чат с GPT") {
+                    NavigationLink("Открыть чат") { AdvisorChatView() }
+                }
                 plan503020Section
                 cushionSection
                 debtsAdviceSection
