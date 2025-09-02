@@ -1,0 +1,74 @@
+
+
+D:.
+│   .gitattributes
+│   .gitignore
+│   README.md
+│   replacements.txt
+│   Схема.txt
+│   Текстовый документ.txt
+│
+├───FinMind
+│   │   ContentView.swift
+│   │   FinMind.entitlements
+│   │   FinMindApp.swift
+│   │
+│   ├───AI
+│   │       ChatStorage.swift
+│   │       KeychainHelper.swift
+│   │       OpenAIChatService.swift
+│   │
+│   ├───Assets.xcassets
+│   │   │   Contents.json
+│   │   │
+│   │   ├───AccentColor.colorset
+│   │   │       Contents.json
+│   │   │
+│   │   └───AppIcon.appiconset
+│   │           Contents.json
+│   │
+│   ├───Models
+│   │       AppState.swift
+│   │       FinanceModels.swift
+│   │
+│   ├───Services
+│   │       BackupService.swift
+│   │       Persistence.swift
+│   │
+│   └───Views
+│       │   RootView.swift
+│       │
+│       ├───Advisor
+│       │       AdvisorChatView.swift
+│       │       AdvisorView.swift
+│       │
+│       ├───Budget
+│       │       AddDebtView.swift
+│       │       AddExpenseView.swift
+│       │       AddGoalView.swift
+│       │       AddIncomeView.swift
+│       │       BudgetView.swift
+│       │
+│       ├───Calendar
+│       │       CalendarListView.swift
+│       │
+│       ├───Debts
+│       │       DebtsListView.swift
+│       │
+│       ├───Goals
+│       │       GoalsListView.swift
+│       │
+│       ├───Settings
+│       │       BackupView.swift
+│       │       SettingsView.swift
+│       │
+│       └───Shared
+│               MoneyFormat.swift
+│               UIStrings.swift
+│               View+PlatformModifiers.swift
+│
+└───FinMind.xcodeproj
+    │   project.pbxproj
+    │
+    └───project.xcworkspace
+            contents.xcworkspacedata

@@ -1,21 +1,6 @@
 import Foundation
 import Combine
 
-extension AppState {
-    /// Мутирует текущий объект, подменяя его данные загруженными с диска (если есть).
-    func loadFromDiskIfAvailable() {
-        guard let loaded = try? Persistence.shared.load() else { return }
-        // перекачиваем значения в опубликованные свойства
-        incomes = loaded.incomes
-        expenses = loaded.expenses
-        debts = loaded.debts
-        goals = loaded.goals
-        dailyEntries = loaded.dailyEntries
-        firstUseAt = loaded.firstUseAt
-    }
-}
-
-
 final class AppState: ObservableObject, Codable {
     // MARK: - Данные
     @Published var incomes: [Income]
@@ -25,26 +10,37 @@ final class AppState: ObservableObject, Codable {
     @Published var dailyEntries: [DailyEntry]
     @Published var firstUseAt: Date
 
+    // Новое: валюта/курсы/запас
+    @Published var baseCurrency: Currency
+    @Published var reserves: [ReserveHolding]
+    @Published var rates: ExchangeRates
+
     enum CodingKeys: String, CodingKey {
         case incomes, expenses, debts, goals, dailyEntries, firstUseAt
+        case baseCurrency, reserves, rates
     }
 
-    // MARK: - Инициализация
     init(incomes: [Income] = [],
          expenses: [Expense] = [],
          debts: [Debt] = [],
          goals: [Goal] = [],
          dailyEntries: [DailyEntry] = [],
-         firstUseAt: Date = Date()) {
+         firstUseAt: Date = Date(),
+         baseCurrency: Currency = .rub,
+         reserves: [ReserveHolding] = [],
+         rates: ExchangeRates = ExchangeRates()) {
+
         self.incomes = incomes
         self.expenses = expenses
         self.debts = debts
         self.goals = goals
         self.dailyEntries = dailyEntries
         self.firstUseAt = firstUseAt
+        self.baseCurrency = baseCurrency
+        self.reserves = reserves
+        self.rates = rates
     }
 
-    // MARK: - Codable
     required init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.incomes = try c.decodeIfPresent([Income].self, forKey: .incomes) ?? []
@@ -53,6 +49,9 @@ final class AppState: ObservableObject, Codable {
         self.goals = try c.decodeIfPresent([Goal].self, forKey: .goals) ?? []
         self.dailyEntries = try c.decodeIfPresent([DailyEntry].self, forKey: .dailyEntries) ?? []
         self.firstUseAt = try c.decodeIfPresent(Date.self, forKey: .firstUseAt) ?? Date()
+        self.baseCurrency = try c.decodeIfPresent(Currency.self, forKey: .baseCurrency) ?? .rub
+        self.reserves = try c.decodeIfPresent([ReserveHolding].self, forKey: .reserves) ?? []
+        self.rates = try c.decodeIfPresent(ExchangeRates.self, forKey: .rates) ?? ExchangeRates()
     }
 
     func encode(to encoder: Encoder) throws {
@@ -63,41 +62,38 @@ final class AppState: ObservableObject, Codable {
         try c.encode(goals, forKey: .goals)
         try c.encode(dailyEntries, forKey: .dailyEntries)
         try c.encode(firstUseAt, forKey: .firstUseAt)
+        try c.encode(baseCurrency, forKey: .baseCurrency)
+        try c.encode(reserves, forKey: .reserves)
+        try c.encode(rates, forKey: .rates)
     }
 
     // MARK: - Автосохранение
     private var cancellables = Set<AnyCancellable>()
 
-    /// Запускаем автосохранение состояния при любых изменениях массивов
     func startAutoSave() {
         let updates: [AnyPublisher<Void, Never>] = [
             $incomes.map { _ in () }.eraseToAnyPublisher(),
             $expenses.map { _ in () }.eraseToAnyPublisher(),
             $debts.map { _ in () }.eraseToAnyPublisher(),
             $goals.map { _ in () }.eraseToAnyPublisher(),
-            $dailyEntries.map { _ in () }.eraseToAnyPublisher()
+            $dailyEntries.map { _ in () }.eraseToAnyPublisher(),
+            $baseCurrency.map { _ in () }.eraseToAnyPublisher(),
+            $reserves.map { _ in () }.eraseToAnyPublisher(),
+            $rates.map { _ in () }.eraseToAnyPublisher()
         ]
-
         Publishers.MergeMany(updates)
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                do {
-                    try Persistence.shared.save(self) // save может кидать — оборачиваем в do/try/catch
-                } catch {
-                    print("Persistence save error:", error.localizedDescription)
-                }
+                do { try Persistence.shared.save(self) }
+                catch { print("Persistence save error:", error.localizedDescription) }
             }
             .store(in: &cancellables)
     }
 
-    /// Ручное сохранение (используется после импорта/восстановления)
     func forceSave() {
-        do {
-            try Persistence.shared.save(self)
-        } catch {
-            print("Persistence forceSave error:", error.localizedDescription)
-        }
+        do { try Persistence.shared.save(self) }
+        catch { print("Persistence forceSave error:", error.localizedDescription) }
     }
 
     // MARK: - Мутации
@@ -116,21 +112,56 @@ final class AppState: ObservableObject, Codable {
     func addDailyEntry(_ entry: DailyEntry) { dailyEntries.append(entry) }
     func removeDailyEntry(_ entry: DailyEntry) { dailyEntries.removeAll { $0.id == entry.id } }
 
-    // MARK: - Метрики (месяц/год)
+    func addReserve(_ r: ReserveHolding) { reserves.append(r) }
+    func removeReserve(_ r: ReserveHolding) { reserves.removeAll { $0.id == r.id } }
+
+    // MARK: - Форматирование/конвертация
+    func formatMoney(_ amount: Double, currency: Currency? = nil) -> String {
+        let c = currency ?? baseCurrency
+        let nf = NumberFormatter()
+        nf.numberStyle = .decimal
+        nf.usesGroupingSeparator = true
+        nf.groupingSeparator = "."
+        nf.decimalSeparator = ","
+        nf.minimumFractionDigits = c.fractionDigits
+        nf.maximumFractionDigits = c.fractionDigits
+        let s = nf.string(from: Decimal(amount) as NSDecimalNumber) ?? "0"
+        return "\(s) \(c.symbol)"
+    }
+
+    func toBase(_ amount: Decimal, from currency: Currency) -> Decimal {
+        rates.convert(amount: amount, from: currency, to: baseCurrency) ?? 0
+    }
+
+    func reserveValueInBase(_ r: ReserveHolding) -> Decimal {
+        switch r.kind {
+        case .fiat(let cur):   return toBase(r.amount, from: cur)
+        case .crypto(let k):   return rates.cryptoTo(currency: baseCurrency, crypto: k, amount: r.amount) ?? 0
+        case .metal(let m):
+            let ounces: Decimal = (r.unit == .gram) ? (r.amount / Decimal(31.1034768)) : r.amount
+            return rates.metalTo(currency: baseCurrency, metal: m, amountInTroyOunces: ounces) ?? 0
+        }
+    }
+
+    func totalReservesInBase() -> Decimal {
+        reserves.reduce(0) { $0 + reserveValueInBase($1) }
+    }
+
+    // MARK: - Метрики
     private var now: Date { Date() }
 
     func totalNormalizedMonthlyRecurringIncome(for month: Date = Date()) -> Double {
-        incomes.reduce(0) { $0 + $1.normalizedMonthlyAmount(for: month) }
+        let sum: Decimal = incomes.reduce(0) { acc, inc in
+            acc + toBase(Decimal(inc.normalizedMonthlyAmount(for: month)), from: inc.currency)
+        }
+        return NSDecimalNumber(decimal: sum).doubleValue
     }
 
     func totalRecurringAnnualIncome(for year: Int = Calendar.app.component(.year, from: Date())) -> Double {
         var total: Double = 0
         let cal = Calendar.app
         for m in 1...12 {
-            var comps = DateComponents()
-            comps.year = year
-            comps.month = m
-            comps.day = 1
+            var comps = DateComponents(); comps.year = year; comps.month = m; comps.day = 1
             if let month = cal.date(from: comps) {
                 total += totalNormalizedMonthlyRecurringIncome(for: month)
             }
@@ -139,41 +170,42 @@ final class AppState: ObservableObject, Codable {
     }
 
     func totalOneOffIncome(for year: Int = Calendar.app.component(.year, from: Date())) -> Double {
-        incomes.reduce(0) { sum, inc in
-            switch inc.kind {
-            case .oneOff(let date, _):
-                return sum + (date.yearInt() == year ? inc.amount : 0)
-            default:
-                return sum
+        let sum: Decimal = incomes.reduce(0) { acc, inc in
+            if case .oneOff(let date, _) = inc.kind, date.yearInt() == year {
+                return acc + toBase(Decimal(inc.amount), from: inc.currency)
             }
+            return acc
         }
+        return NSDecimalNumber(decimal: sum).doubleValue
     }
 
-    /// Годовой доход = сумма нормированных помесячных рекуррентных + разовые в пределах года
     func totalAnnualIncome(for year: Int = Calendar.app.component(.year, from: Date())) -> Double {
         totalRecurringAnnualIncome(for: year) + totalOneOffIncome(for: year)
     }
 
-    // Expenses
     func totalNormalizedMonthlyRecurringExpense(for month: Date = Date()) -> Double {
-        var base = expenses.reduce(0) { $0 + $1.normalizedMonthlyAmount(for: month) }
-        // Обязательные платежи по долгам
-        base += debts.reduce(0) { $0 + $1.obligatoryMonthlyPayment }
-        return base
+        var base: Decimal = expenses.reduce(0) { acc, e in
+            acc + toBase(Decimal(e.normalizedMonthlyAmount(for: month)), from: e.currency)
+        }
+        base += debts.reduce(0) { acc, d in
+            acc + toBase(Decimal(d.obligatoryMonthlyPayment), from: d.currency)
+        }
+        return NSDecimalNumber(decimal: base).doubleValue
     }
 
     func plannedMonthlyExpense(for month: Date = Date()) -> Double {
         let recurring = totalNormalizedMonthlyRecurringExpense(for: month)
-        let plannedExtras = dailyEntries
+        let planned: Decimal = dailyEntries
             .filter { $0.type == .expense && $0.planned && $0.date.isSameMonth(as: month) }
-            .reduce(0) { $0 + $1.amount }
-        return recurring + plannedExtras
+            .reduce(0) { $0 + toBase(Decimal($1.amount), from: $1.currency) }
+        return recurring + NSDecimalNumber(decimal: planned).doubleValue
     }
 
     func actualMonthlyExpense(for month: Date = Date()) -> Double {
-        dailyEntries
+        let sum: Decimal = dailyEntries
             .filter { $0.type == .expense && !$0.planned && $0.date.isSameMonth(as: month) }
-            .reduce(0) { $0 + $1.amount }
+            .reduce(0) { $0 + toBase(Decimal($1.amount), from: $1.currency) }
+        return NSDecimalNumber(decimal: sum).doubleValue
     }
 
     func annualExpense(for year: Int = Calendar.app.component(.year, from: Date())) -> Double {
@@ -182,31 +214,43 @@ final class AppState: ObservableObject, Codable {
         for m in 1...12 {
             var comps = DateComponents(); comps.year = year; comps.month = m; comps.day = 1
             if let month = cal.date(from: comps) {
-                total += plannedMonthlyExpense(for: month) // план как «база»
+                total += plannedMonthlyExpense(for: month)
             }
         }
         return total
     }
 
     func plannedDailyAverageCurrentMonth() -> Double {
-        let month = now
-        let plan = plannedMonthlyExpense(for: month)
-        let days = Double(month.daysInMonth())
+        let days = Double(now.daysInMonth())
+        let plan = plannedMonthlyExpense(for: now)
         return days > 0 ? plan / days : 0
     }
 
     func actualDailyAverageCurrentMonth() -> Double? {
-        // доступно, если пользователь в системе ≥ 3 месяца и есть факт-данные
         let cal = Calendar.app
-        if let earliest = (dailyEntries.map { $0.createdAt }.min()),
+        if let earliest = dailyEntries.map({ $0.createdAt }).min(),
            let threeMonthsAgo = cal.date(byAdding: .month, value: -3, to: now),
            earliest <= threeMonthsAgo {
-            let currentMonthSum = actualMonthlyExpense(for: now)
+            let current = actualMonthlyExpense(for: now)
             let day = Double(cal.component(.day, from: now))
-            if day > 0 && currentMonthSum > 0 {
-                return currentMonthSum / day
-            }
+            if day > 0 && current > 0 { return current / day }
         }
         return nil
+    }
+
+    // MARK: - Курсы (демо)
+    @MainActor
+    func updateRates() async {
+        var r = rates
+        r.usdPerUnitFiat["USD"] = 1
+        r.usdPerUnitFiat["EUR"] = 1.10
+        r.usdPerUnitFiat["RUB"] = 0.011
+        r.usdPerUnitFiat["CNY"] = 0.14
+        r.usdPerTroyOunce[.XAU] = 2000
+        r.usdPerTroyOunce[.XAG] = 25
+        r.usdPerCoin[.BTC] = 60000
+        r.usdPerCoin[.ETH] = 2500
+        r.updatedAt = Date()
+        rates = r
     }
 }

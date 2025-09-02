@@ -2,16 +2,20 @@ import SwiftUI
 
 @main
 struct FinMindApp: App {
-    @StateObject private var app = AppState()
+    @StateObject private var appState: AppState
+
+    init() {
+        // Пытаемся загрузить сохранённое состояние; если нет — создаём дефолтное
+        let loaded = (try? Persistence.shared.load()) ?? AppState()
+        _appState = StateObject(wrappedValue: loaded)
+    }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(app)
+            ContentView()
+                .environmentObject(appState)
                 .onAppear {
-                    // загружаем сохранённое состояние, если есть
-                    app.loadFromDiskIfAvailable()
-                    // app.startAutoSave() — не нужно вызывать: оно уже запускается в init() AppState
+                    appState.startAutoSave()
                 }
         }
     }
