@@ -114,21 +114,48 @@ struct Debt: Identifiable, Codable {
     var currency: Currency = .rub
 }
 
+
+
 struct Goal: Identifiable, Codable {
     var id: UUID = UUID()
     var title: String
     var targetAmount: Double
     var currency: Currency = .rub
+    var deadline: Date? = nil   // ← НОВОЕ поле. Опционально!
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, targetAmount, currency, deadline
+    }
+
+    init(id: UUID = UUID(),
+         title: String,
+         targetAmount: Double,
+         currency: Currency = .rub,
+         deadline: Date? = nil) {
+        self.id = id
+        self.title = title
+        self.targetAmount = targetAmount
+        self.currency = currency
+        self.deadline = deadline
+    }
+
+    // Мягкая декодировка: если поля не было в старом JSON — подставим дефолт
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try c.decode(String.self, forKey: .title)
+        targetAmount = try c.decode(Double.self, forKey: .targetAmount)
+        currency = try c.decodeIfPresent(Currency.self, forKey: .currency) ?? .rub
+        deadline = try c.decodeIfPresent(Date.self, forKey: .deadline) // может быть nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(targetAmount, forKey: .targetAmount)
+        try c.encode(currency, forKey: .currency)
+        try c.encodeIfPresent(deadline, forKey: .deadline)
+    }
 }
 
-enum EntryType: String, Codable { case expense, income }
-
-struct DailyEntry: Identifiable, Codable {
-    var id: UUID = UUID()
-    var type: EntryType = .expense
-    var planned: Bool = false
-    var amount: Double
-    var currency: Currency = .rub
-    var date: Date
-    var createdAt: Date = Date()
-}

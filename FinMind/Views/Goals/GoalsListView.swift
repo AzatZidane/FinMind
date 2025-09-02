@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 struct GoalsListView: View {
     @EnvironmentObject var app: AppState
@@ -34,12 +35,19 @@ struct GoalsListView: View {
     private func row(_ g: Goal) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(g.name)
-                Text("дедлайн: \(g.deadline.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(g.name) // благодаря NameCompat работает как title
+                if let deadline = g.deadline {
+                    Text(deadline, format: Date.FormatStyle(date: .abbreviated, time: .omitted))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Без срока")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
             Spacer()
-            Text(g.targetAmount.asMoney)  // ← форматированная сумма
+            Text(g.targetAmount.asMoney) // формат суммы как раньше
                 .font(.headline.monospacedDigit())
         }
     }
