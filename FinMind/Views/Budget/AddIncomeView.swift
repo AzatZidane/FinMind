@@ -52,11 +52,3 @@ struct AddIncomeView: View {
     }
 }
 
-private extension Recurrence {
-    var localized: String {
-        switch self {
-        case .daily: "Ежедневно"; case .weekly: "Еженедельно"; case .monthly: "Ежемесячно"
-        case .quarterly: "Ежеквартально"; case .yearly: "Ежегодно"
-        }
-    }
-}
