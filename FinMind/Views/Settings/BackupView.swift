@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct BackupView: View {
     @EnvironmentObject var app: AppState
@@ -30,7 +31,7 @@ struct BackupView: View {
                     Label("Экспорт в JSON…", systemImage: "square.and.arrow.up")
                 }
 
-                Button(role: .none) {
+                Button {
                     isImporting = true
                 } label: {
                     Label("Восстановить из файла…", systemImage: "square.and.arrow.down")
@@ -56,7 +57,7 @@ struct BackupView: View {
             do {
                 let url = try result.get()
                 let data = try Data(contentsOf: url)
-                try BackupCodec.applyJSON(data, to: app)
+                try BackupCodec.applyJSON(data, to: app) // <— без from:, как в BackupService.swift
             } catch {
                 show("Ошибка при восстановлении: \(error.localizedDescription)")
             }
