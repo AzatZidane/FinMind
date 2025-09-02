@@ -14,7 +14,9 @@ struct DebtsListView: View {
                         ForEach(Array(app.debts.enumerated()), id: \.offset) { _, debt in
                             row(debt)
                         }
-                        .onDelete(perform: delete)
+                        .onDelete { offsets in
+                            app.debts.remove(atOffsets: offsets)
+                        }
                     }
                 }
             }
@@ -30,45 +32,19 @@ struct DebtsListView: View {
         }
     }
 
-    // Строка списка
     @ViewBuilder
     private func row(_ d: Debt) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(d.name)
-                Text(subtitle(for: d))
-                    .font(.caption).foregroundStyle(.secondary)
+                Text(d.name) // через NameCompat -> .title
+                Text("ежемесячный платёж")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
-            if let amt = amount(for: d) {
-                Text(amt.asMoney)
-                    .font(.headline.monospacedDigit())
-            }
+            Text(app.formatMoney(d.obligatoryMonthlyPayment, currency: d.currency))
+                .font(.headline.monospacedDigit())
         }
-    }
-
-    // Доп. подпись и сумма справа
-    private func subtitle(for d: Debt) -> String {
-        switch d.input {
-        case .monthlyPayment(_, let isMinimum):
-            return isMinimum ? "ежемесячный (минимум)" : "ежемесячный"
-        case .loan(_, _, let termMonths, let grace, _):
-            if let g = grace { return "кредит • \(termMonths) мес • грейс \(g) мес" }
-            return "кредит • \(termMonths) мес"
-        }
-    }
-
-    private func amount(for d: Debt) -> Double? {
-        switch d.input {
-        case .monthlyPayment(let amount, _):
-            return amount
-        case .loan(let principal, _, _, _, let minPayment):
-            return minPayment ?? principal
-        }
-    }
-
-    private func delete(at offsets: IndexSet) {
-        app.debts.remove(atOffsets: offsets)
     }
 }
 
