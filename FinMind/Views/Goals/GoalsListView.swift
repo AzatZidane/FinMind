@@ -35,7 +35,7 @@ struct GoalsListView: View {
     private func row(_ g: Goal) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(g.name) // благодаря NameCompat работает как title
+                Text(g.name) // NameCompat: .name -> .title
                 if let deadline = g.deadline {
                     Text(deadline, format: Date.FormatStyle(date: .abbreviated, time: .omitted))
                         .font(.caption)
