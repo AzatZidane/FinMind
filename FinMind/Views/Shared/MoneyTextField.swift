@@ -4,7 +4,7 @@ import UIKit
 /// Поле ввода денег с живым форматированием:
 /// - Цифры всегда добавляются в ЦЕЛУЮ часть (до запятой).
 /// - Разделители тысяч — полупрозрачные.
-/// - Минимум/максимум знаков после запятой = fractionDigits (по умолчанию 2).
+/// - Кол-во знаков после запятой = fractionDigits (по умолчанию 2).
 struct MoneyTextField: UIViewRepresentable {
     @Binding var value: Decimal?
     var fractionDigits: Int = 2
@@ -97,11 +97,11 @@ struct MoneyTextField: UIViewRepresentable {
             return cleaned.filter { $0.isNumber }
         }
 
-        // Собираем строку из цифр целой части и рисуем ",00"
+        // Собираем строку из цифр целой части
         private func text(fromIntegerDigits digits: String) -> String {
             if digits.isEmpty { return "" }
             let dec = Decimal(string: digits) ?? 0
-            return format(dec)
+            return format(dec) // гарантирует дробную часть с fractionDigits
         }
 
         // MARK: UITextFieldDelegate
@@ -110,9 +110,9 @@ struct MoneyTextField: UIViewRepresentable {
                        shouldChangeCharactersIn range: NSRange,
                        replacementString string: String) -> Bool {
 
-            // Разрешаем только цифры и backspace. Запятую намеренно игнорируем —
-            // мы всегда редактируем ЦЕЛУЮ часть, дробная часть рисуется как нули.
-            if !string.isEmpty, string.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) != nil {
+            // Разрешаем только цифры и backspace.
+            if !string.isEmpty,
+               string.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) != nil {
                 return false
             }
 
@@ -160,14 +160,19 @@ struct MoneyTextField: UIViewRepresentable {
 
             // Ставим каретку ПЕРЕД запятой (чтобы следующие цифры шли в целую часть)
             if placeCursorBeforeDecimal,
-               let t = textField.text,
-               let sepRange = (t as NSString).range(of: decimalSeparator, options: []).toTextRange(textField) {
-                textField.selectedTextRange = sepRange.start ..< sepRange.start
-            } else {
-                // иначе в конец
-                let end = textField.endOfDocument
-                textField.selectedTextRange = textField.textRange(from: end, to: end)
+               let t = textField.text {
+                let ns = t as NSString
+                let sepRange = ns.range(of: decimalSeparator)
+                if sepRange.location != NSNotFound,
+                   let startPos = textField.position(from: textField.beginningOfDocument, offset: sepRange.location),
+                   let caretRange = textField.textRange(from: startPos, to: startPos) {
+                    textField.selectedTextRange = caretRange
+                    return
+                }
             }
+            // иначе — в конец
+            let end = textField.endOfDocument
+            textField.selectedTextRange = textField.textRange(from: end, to: end)
         }
 
         func attributed(_ s: String) -> NSAttributedString {
@@ -190,13 +195,5 @@ struct MoneyTextField: UIViewRepresentable {
         func applyAttributes(on textField: UITextField) {
             if let t = textField.text { textField.attributedText = attributed(t) }
         }
-    }
-}
-
-private extension NSRange {
-    func toTextRange(_ textField: UITextField) -> UITextRange? {
-        guard let start = textField.position(from: textField.beginningOfDocument, offset: location),
-              let end = textField.position(from: start, offset: length) else { return nil }
-        return textField.textRange(from: start, to: end)
     }
 }
