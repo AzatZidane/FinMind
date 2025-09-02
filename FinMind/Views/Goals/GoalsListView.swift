@@ -47,7 +47,7 @@ struct GoalsListView: View {
                 }
             }
             Spacer()
-            Text(g.targetAmount.asMoney) // формат суммы как раньше
+            Text(app.formatMoney(g.targetAmount, currency: g.currency))
                 .font(.headline.monospacedDigit())
         }
     }

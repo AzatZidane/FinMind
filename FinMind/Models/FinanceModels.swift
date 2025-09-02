@@ -157,5 +157,20 @@ struct Goal: Identifiable, Codable {
         try c.encode(currency, forKey: .currency)
         try c.encodeIfPresent(deadline, forKey: .deadline)
     }
+    // MARK: - Ежедневные записи (для фактических трат/доходов)
+
+    enum EntryType: String, Codable { case expense, income }
+
+    struct DailyEntry: Identifiable, Codable {
+        var id: UUID = UUID()
+        var type: EntryType = .expense
+        var planned: Bool = false
+        var amount: Double
+        var currency: Currency = .rub
+        var date: Date
+        var createdAt: Date = Date()
+    }
+
+
 }
 
