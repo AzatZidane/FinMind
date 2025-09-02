@@ -6,27 +6,43 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(header: Text("Профиль")) {
-                    // твои элементы профиля
-                    Text("Имя профиля (заглушка)")
+                Section("Отображение") {
+                    Toggle("Показывать копейки", isOn: $app.useCents)
+                    Picker("Тема", selection: $app.appearance) {
+                        ForEach(AppAppearance.allCases) { ap in
+                            Text(ap.title).tag(ap)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
 
-                Section(header: Text("Параметры")) {
-                    // твои параметры приложения
-                    Toggle("Автосохранение (всегда включено)", isOn: .constant(true))
-                        .disabled(true)
+                Section("Валюта") {
+                    Picker("Базовая валюта", selection: $app.baseCurrency) {
+                        ForEach(Currency.supported) { Text("\($0.code) \($0.symbol)").tag($0) }
+                    }
                 }
 
-                // НОВЫЙ раздел
-                Section(header: Text("Данные")) {
+                Section("Курсы (демо)") {
+                    HStack {
+                        Text("Обновлено")
+                        Spacer()
+                        Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Обновить курсы") {
+                        Task { await app.updateRates() }
+                    }
+                }
+
+                Section("Резервная копия") {
                     NavigationLink {
                         BackupView().environmentObject(app)
                     } label: {
-                        Label("Резервная копия", systemImage: "externaldrive.badge.icloud")
+                        Label("Экспорт/Импорт JSON", systemImage: "externaldrive.badge.icloud")
                     }
                 }
             }
-            .navigationTitle(UIStrings.tab4) // если у тебя другой заголовок — поставь свой
+            .navigationTitle("Настройки")
         }
     }
 }

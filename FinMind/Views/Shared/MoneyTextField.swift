@@ -2,9 +2,9 @@ import SwiftUI
 import UIKit
 
 /// Поле ввода денег с живым форматированием:
-/// - Цифры всегда добавляются в ЦЕЛУЮ часть (до запятой).
+/// - Работает и с копейками (fractionDigits > 0), и без (fractionDigits = 0).
 /// - Разделители тысяч — полупрозрачные.
-/// - Кол-во знаков после запятой = fractionDigits (по умолчанию 2).
+/// - Курсор ставится в нужное место автоматически.
 struct MoneyTextField: UIViewRepresentable {
     @Binding var value: Decimal?
     var fractionDigits: Int = 2
@@ -18,7 +18,7 @@ struct MoneyTextField: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UITextField {
         let tf = UITextField()
-        tf.keyboardType = .decimalPad
+        tf.keyboardType = .numberPad  // вводим только цифры; точку/запятую набивать не нужно
         tf.delegate = context.coordinator
         tf.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged), for: .editingChanged)
         tf.font = font
@@ -36,10 +36,11 @@ struct MoneyTextField: UIViewRepresentable {
         context.coordinator.textColor = textColor
         context.coordinator.font = font
 
-        // Синхронизация значения -> текста
         let formatted = context.coordinator.format(value)
         if uiView.text != formatted {
-            context.coordinator.setFormattedText(formatted, on: uiView, placeCursorBeforeDecimal: true)
+            context.coordinator.setFormattedText(formatted,
+                                                 on: uiView,
+                                                 placeCursorBeforeDecimal: (fractionDigits > 0))
         }
     }
 
@@ -66,7 +67,6 @@ struct MoneyTextField: UIViewRepresentable {
             self.font = parent.font
         }
 
-        // Базовый форматтер
         private lazy var numberFormatter: NumberFormatter = {
             let nf = NumberFormatter()
             nf.numberStyle = .decimal
@@ -77,8 +77,8 @@ struct MoneyTextField: UIViewRepresentable {
         private func rebuildFormatter() {
             numberFormatter.groupingSeparator = groupingSeparator
             numberFormatter.decimalSeparator = decimalSeparator
-            numberFormatter.minimumFractionDigits = fractionDigits
-            numberFormatter.maximumFractionDigits = fractionDigits
+            numberFormatter.minimumFractionDigits = max(0, fractionDigits)
+            numberFormatter.maximumFractionDigits = max(0, fractionDigits)
         }
 
         // MARK: Public helpers
@@ -89,19 +89,25 @@ struct MoneyTextField: UIViewRepresentable {
             return numberFormatter.string(from: value as NSDecimalNumber) ?? ""
         }
 
-        // Достаём ЦЕЛУЮ часть как «чистые» цифры (без разделителей)
+        /// Возвращает все цифры из строки, учитывая режим:
+        /// - если fractionDigits == 0 — просто убираем разделители и не глядим на запятую;
+        /// - если > 0 — берем только целую часть (цифры до запятой).
         private func integerDigits(in s: String) -> String {
-            let parts = s.components(separatedBy: decimalSeparator)
-            let integerPart = parts.first ?? s
-            let cleaned = integerPart.replacingOccurrences(of: groupingSeparator, with: "")
-            return cleaned.filter { $0.isNumber }
+            if fractionDigits == 0 {
+                // Удаляем все нецифры
+                return s.filter { $0.isNumber }
+            } else {
+                let parts = s.components(separatedBy: decimalSeparator)
+                let integerPart = parts.first ?? s
+                let cleaned = integerPart.replacingOccurrences(of: groupingSeparator, with: "")
+                return cleaned.filter { $0.isNumber }
+            }
         }
 
-        // Собираем строку из цифр целой части
         private func text(fromIntegerDigits digits: String) -> String {
             if digits.isEmpty { return "" }
             let dec = Decimal(string: digits) ?? 0
-            return format(dec) // гарантирует дробную часть с fractionDigits
+            return format(dec)
         }
 
         // MARK: UITextFieldDelegate
@@ -110,7 +116,7 @@ struct MoneyTextField: UIViewRepresentable {
                        shouldChangeCharactersIn range: NSRange,
                        replacementString string: String) -> Bool {
 
-            // Разрешаем только цифры и backspace.
+            // Разрешаем только цифры и backspace
             if !string.isEmpty,
                string.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) != nil {
                 return false
@@ -129,15 +135,17 @@ struct MoneyTextField: UIViewRepresentable {
 
             if digits.isEmpty {
                 parent.value = nil
-                setFormattedText("", on: textField, placeCursorBeforeDecimal: true)
+                setFormattedText("", on: textField, placeCursorBeforeDecimal: false)
                 return false
             }
 
             let newValue = Decimal(string: digits) ?? 0
             parent.value = newValue
 
-            let formatted = text(fromIntegerDigits: digits) // "12.345,00"
-            setFormattedText(formatted, on: textField, placeCursorBeforeDecimal: true)
+            let formatted = text(fromIntegerDigits: digits)
+            setFormattedText(formatted,
+                             on: textField,
+                             placeCursorBeforeDecimal: (fractionDigits > 0))
 
             return false // сами обновили текст
         }
@@ -158,7 +166,6 @@ struct MoneyTextField: UIViewRepresentable {
             textField.attributedText = attributed(formatted)
             applyAttributes(on: textField)
 
-            // Ставим каретку ПЕРЕД запятой (чтобы следующие цифры шли в целую часть)
             if placeCursorBeforeDecimal,
                let t = textField.text {
                 let ns = t as NSString
