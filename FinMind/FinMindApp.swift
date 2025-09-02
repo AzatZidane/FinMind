@@ -5,8 +5,7 @@ struct FinMindApp: App {
     @StateObject private var appState: AppState
 
     init() {
-        // Пытаемся загрузить сохранённое состояние; если нет — создаём дефолтное
-        let loaded = (try? Persistence.shared.load()) ?? AppState()
+        let loaded = Persistence.shared.load() ?? AppState()
         _appState = StateObject(wrappedValue: loaded)
     }
 
@@ -14,9 +13,7 @@ struct FinMindApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .onAppear {
-                    appState.startAutoSave()
-                }
+                .onAppear { appState.startAutoSave() }
         }
     }
 }
