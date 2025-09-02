@@ -21,3 +21,10 @@ extension Goal {
         set { title = newValue }
     }
 }
+
+extension Debt {
+    var name: String {
+        get { title }
+        set { title = newValue }
+    }
+}
