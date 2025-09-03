@@ -8,17 +8,33 @@ struct AdvisorChatView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(Array(vm.messages.enumerated()), id: \.offset) { idx, msg in
-                                bubble(for: msg).id(idx)
+                    // iOS 17+: новая сигнатура onChange; для более старых оставлен старый вариант
+                    if #available(iOS 17.0, *) {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(Array(vm.messages.enumerated()), id: \.offset) { idx, msg in
+                                    bubble(for: msg).id(idx)
+                                }
+                                if vm.isStreaming { ProgressView().padding(.leading, 8) }
                             }
-                            if vm.isStreaming { ProgressView().padding(.leading, 8) }
+                            .padding(12)
                         }
-                        .padding(12)
-                    }
-                    .onChange(of: vm.messages.count) { _ in
-                        withAnimation { proxy.scrollTo(vm.messages.count - 1, anchor: .bottom) }
+                        .onChange(of: vm.messages.count) { _, _ in
+                            withAnimation { proxy.scrollTo(vm.messages.count - 1, anchor: .bottom) }
+                        }
+                    } else {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(Array(vm.messages.enumerated()), id: \.offset) { idx, msg in
+                                    bubble(for: msg).id(idx)
+                                }
+                                if vm.isStreaming { ProgressView().padding(.leading, 8) }
+                            }
+                            .padding(12)
+                        }
+                        .onChange(of: vm.messages.count) { _ in
+                            withAnimation { proxy.scrollTo(vm.messages.count - 1, anchor: .bottom) }
+                        }
                     }
                 }
 
@@ -80,11 +96,9 @@ final class ChatVM: ObservableObject {
     private let storage = ChatStorage.shared
 
     init() {
-        // Загружаем историю при создании
         self.messages = storage.load()
     }
 
-    /// Формируем system‑prompt из текущих данных пользователя
     private func systemMessage(app: AppState) -> ChatMessage {
         var text = "Вы — финансовый помощник. Давайте рекомендации осторожно и без категоричных обещаний.\n"
         text += "Вот текущие данные пользователя:\n"
@@ -118,7 +132,7 @@ final class ChatVM: ObservableObject {
         let userMsg = ChatMessage(role: .user, content: text)
 
         // Контекст = свежий system (с данными) + история + новый вопрос
-        var context: [ChatMessage] = [systemMessage(app: app)] + messages + [userMsg]
+        let context: [ChatMessage] = [systemMessage(app: app)] + messages + [userMsg]
 
         messages.append(userMsg)
 
@@ -139,7 +153,7 @@ final class ChatVM: ObservableObject {
                 Task { @MainActor in
                     guard let self = self else { return }
                     self.isStreaming = false
-                    self.storage.save(self.messages)   // сохраняем историю после ответа
+                    self.storage.save(self.messages)
                 }
             })
         } catch {

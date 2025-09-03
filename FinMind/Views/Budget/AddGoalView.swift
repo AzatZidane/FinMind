@@ -12,11 +12,13 @@ struct AddGoalView: View {
         NavigationStack {
             Form {
                 TextField("Название", text: $title)
+
                 MoneyTextField(value: $amount,
                                fractionDigits: appState.fractionDigits(for: currency),
                                groupingSeparator: ".",
                                decimalSeparator: ",",
                                placeholder: "0")
+
                 Picker("Валюта", selection: $currency) {
                     ForEach(Currency.supported) { Text("\($0.code) \($0.symbol)").tag($0) }
                 }

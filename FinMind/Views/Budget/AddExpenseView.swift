@@ -13,14 +13,17 @@ struct AddExpenseView: View {
         NavigationStack {
             Form {
                 TextField("Название", text: $title)
+
                 MoneyTextField(value: $amount,
-                                fractionDigits: app.fractionDigits(for: currency),
-                                groupingSeparator: ".",
-                                decimalSeparator: ",",
-                                placeholder: "0")
+                               fractionDigits: appState.fractionDigits(for: currency),
+                               groupingSeparator: ".",
+                               decimalSeparator: ",",
+                               placeholder: "0")
+
                 Picker("Валюта", selection: $currency) {
                     ForEach(Currency.supported) { Text("\($0.code) \($0.symbol)").tag($0) }
                 }
+
                 Picker("Периодичность", selection: $rec) {
                     ForEach(Recurrence.allCases) { Text($0.localized).tag($0) }
                 }
@@ -32,8 +35,10 @@ struct AddExpenseView: View {
                     Button("Сохранить") {
                         let amt = NSDecimalNumber(decimal: amount ?? 0).doubleValue
                         let item = Expense(title: title, amount: amt, currency: currency, kind: .recurring(rec))
-                        appState.addExpense(item); dismiss()
-                    }.disabled(title.isEmpty || (amount ?? 0) == 0)
+                        appState.addExpense(item)
+                        dismiss()
+                    }
+                    .disabled(title.isEmpty || (amount ?? 0) == 0)
                 }
             }
         }
