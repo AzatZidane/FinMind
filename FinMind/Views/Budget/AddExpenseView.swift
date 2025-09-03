@@ -21,7 +21,9 @@ struct AddExpenseView: View {
                                placeholder: "0")
 
                 Picker("Валюта", selection: $currency) {
-                    ForEach(Currency.supported) { Text("\($0.code) \($0.symbol)").tag($0) }
+                    ForEach(Currency.supported, id: \.code) { c in
+                        Text("\(c.code) \n\(c.symbol)").tag(c as Currency)
+                    }
                 }
 
                 Picker("Периодичность", selection: $rec) {
