@@ -38,13 +38,11 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Button("Обновить курсы") {
-                            // В демо просто отметим время последнего обновления
+                            // Без асинхронщины — ничего не «залипнет»
                             app.rates.updatedAt = Date()
                         }
                     }
-                } header: {
-                    Text("Курсы (демо)")
-                }
+                } header: { Text("Курсы (демо)") }
 
                 // MARK: Бэкап
                 Section("Резервная копия") {
