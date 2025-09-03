@@ -41,7 +41,7 @@ private struct SeriesPoint: Identifiable {
     let id = UUID()
     let date: Date        // начало месяца/квартала
     let series: Series
-    let value: Double     // всегда в базовой валюте
+    let value: Double     // в базовой валюте
 }
 
 struct ChartsView: View {
@@ -85,7 +85,7 @@ private struct ChartsScreen: View {
                     switch kind {
                     case .bars:
                         BarMark(
-                            x: .value("Период", p.date, unit: xAxisUnit),
+                            x: .value("Период", p.date, unit: .month),   // ← всегда .month
                             y: .value("Сумма", p.value)
                         )
                         .foregroundStyle(by: .value("Серия", p.series.rawValue))
@@ -93,14 +93,14 @@ private struct ChartsScreen: View {
 
                     case .lines:
                         LineMark(
-                            x: .value("Период", p.date, unit: xAxisUnit),
+                            x: .value("Период", p.date, unit: .month),   // ← всегда .month
                             y: .value("Сумма", p.value)
                         )
                         .foregroundStyle(by: .value("Серия", p.series.rawValue))
                         .interpolationMethod(.catmullRom)
 
                         PointMark(
-                            x: .value("Период", p.date, unit: xAxisUnit),
+                            x: .value("Период", p.date, unit: .month),
                             y: .value("Сумма", p.value)
                         )
                         .foregroundStyle(by: .value("Серия", p.series.rawValue))
@@ -112,18 +112,16 @@ private struct ChartsScreen: View {
                         AxisMarks(values: .stride(by: .month)) { _ in
                             AxisGridLine()
                             AxisTick()
-                            // ✅ Правильный вариант для дат: только format:
                             AxisValueLabel(format: .dateTime.month(.abbreviated))
                         }
+
                     case .quarter:
-                        AxisMarks(values: .stride(by: .quarter)) { value in
+                        // Вместо .quarter используем «каждые 3 месяца»
+                        AxisMarks(values: .stride(by: .month, count: 3)) { value in
                             AxisGridLine()
                             AxisTick()
-                            // ✅ Для квартала формируем подпись вручную
-                            if let date = value.as(Date.self) {
-                                AxisValueLabel {
-                                    Text(quarterLabel(date))
-                                }
+                            if let d = value.as(Date.self) {
+                                AxisValueLabel { Text(quarterLabel(startOfQuarter(for: d))) }
                             }
                         }
                     }
@@ -174,23 +172,17 @@ private struct ChartsScreen: View {
 
     // MARK: - Data
 
-    private var xAxisUnit: Calendar.Component {
-        bucket == .month ? .month : .quarter
-    }
-
     private var months: [Date] {
         let cal = Calendar.current
-        // начало текущего месяца
-        let now = cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
+        let now = cal.date(from: cal.dateComponents([.year, .month], from: Date()))! // начало текущего месяца
         return (0..<range.rawValue).reversed().compactMap { i in
             cal.date(byAdding: .month, value: -i, to: now)
         }
     }
 
     private var quarters: [Date] {
-        // начало кварталов за выбранный горизонт
-        let starts = months.map { startOfQuarter(for: $0) } // removed unused 'cal'
-        // уникальные, по порядку
+        // начало кварталов за выбранный горизонт (уникальные, по порядку)
+        let starts = months.map { startOfQuarter(for: $0) }
         var uniq: [Date] = []
         for d in starts where uniq.last != d { uniq.append(d) }
         return uniq
