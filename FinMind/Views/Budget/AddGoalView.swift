@@ -13,7 +13,7 @@ struct AddGoalView: View {
             Form {
                 TextField("Название", text: $title)
                 MoneyTextField(value: $amount,
-                               fractionDigits: app.fractionDigits(for: currency),
+                               fractionDigits: appState.fractionDigits(for: currency),
                                groupingSeparator: ".",
                                decimalSeparator: ",",
                                placeholder: "0")
@@ -28,8 +28,10 @@ struct AddGoalView: View {
                     Button("Сохранить") {
                         let amt = NSDecimalNumber(decimal: amount ?? 0).doubleValue
                         let item = Goal(title: title, targetAmount: amt, currency: currency)
-                        appState.addGoal(item); dismiss()
-                    }.disabled(title.isEmpty || (amount ?? 0) == 0)
+                        appState.addGoal(item)
+                        dismiss()
+                    }
+                    .disabled(title.isEmpty || (amount ?? 0) == 0)
                 }
             }
         }
