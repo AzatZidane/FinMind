@@ -1,66 +1,56 @@
 import Foundation
-import SwiftUI
-import UniformTypeIdentifiers
 
-// Все твои модели должны быть Codable (Income/Expense/Debt/Goal уже такие в проекте)
-struct BackupPayload: Codable {
-    var createdAt: Date
-    var incomes: [Income]
-    var expenses: [Expense]
-    var debts: [Debt]
-    var goals: [Goal]
-    // на будущее можно добавить версию схемы
-    var schemaVersion: Int = 1
-}
+final class BackupService {
+    static let shared = BackupService()
 
-// FileDocument для .fileExporter / .fileImporter
-struct BackupDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-    var data: Data
+    // Готовим кодировщики
+    private let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        e.dateEncodingStrategy = .iso8601
+        return e
+    }()
 
-    init(data: Data) { self.data = data }
+    private func makeDecoderISO() -> JSONDecoder {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }
 
-    init(configuration: ReadConfiguration) throws {
-        guard let d = configuration.file.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
+    private func makeDecoderDefault() -> JSONDecoder {
+        JSONDecoder() // на случай старых бэкапов без ISO‑дат
+    }
+
+    // Экспорт всего AppState в JSON
+    func makeJSON(from app: AppState) throws -> Data {
+        try encoder.encode(app)
+    }
+
+    // Импорт JSON в существующий AppState
+    func restore(from data: Data, into app: AppState) throws {
+        // Сначала пробуем ISO‑8601, затем дефолт
+        let decoded: AppState
+        do {
+            decoded = try makeDecoderISO().decode(AppState.self, from: data)
+        } catch {
+            decoded = try makeDecoderDefault().decode(AppState.self, from: data)
         }
-        self.data = d
-    }
 
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
-    }
-}
+        // Переносим данные (перезаписываем поля)
+        app.incomes      = decoded.incomes
+        app.expenses     = decoded.expenses
+        app.debts        = decoded.debts
+        app.goals        = decoded.goals
+        app.dailyEntries = decoded.dailyEntries
+        app.firstUseAt   = decoded.firstUseAt
 
-// Утилиты сериализации (вынесено сюда, чтобы не трогать Persistence)
-enum BackupCodec {
-    static func makeJSON(from app: AppState) throws -> Data {
-        let payload = BackupPayload(
-            createdAt: Date(),
-            incomes: app.incomes,
-            expenses: app.expenses,
-            debts: app.debts,
-            goals: app.goals
-        )
-        let enc = JSONEncoder()
-        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        enc.dateEncodingStrategy = .iso8601
-        return try enc.encode(payload)
-    }
+        app.baseCurrency = decoded.baseCurrency
+        app.reserves     = decoded.reserves
+        app.rates        = decoded.rates
 
-    static func applyJSON(_ data: Data, to app: AppState) throws {
-        let dec = JSONDecoder()
-        dec.dateDecodingStrategy = .iso8601
-        let payload = try dec.decode(BackupPayload.self, from: data)
+        app.useCents     = decoded.useCents
+        app.appearance   = decoded.appearance
 
-        // Заменяем состояние АТОМАРНО
-        app.incomes = payload.incomes
-        app.expenses = payload.expenses
-        app.debts = payload.debts
-        app.goals = payload.goals
-
-        // Если у тебя есть ручное сохранение — дерни его
-        // (автосейв через Combine у тебя уже настроен, но на всякий)
         app.forceSave()
     }
 }
