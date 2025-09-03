@@ -16,15 +16,20 @@ struct AddIncomeView: View {
             Form {
                 Section {
                     TextField("Название", text: $title)
+
                     MoneyTextField(value: $amount,
-                                   fractionDigits: app.fractionDigits(for: currency),
+                                   fractionDigits: appState.fractionDigits(for: currency),
                                    groupingSeparator: ".",
                                    decimalSeparator: ",",
                                    placeholder: "0")
+
                     Picker("Валюта", selection: $currency) {
-                        ForEach(Currency.supported) { Text("\($0.code) \($0.symbol)").tag($0) }
+                        ForEach(Currency.supported, id: \.code) { c in
+                            Text("\(c.code) \n\(c.symbol)").tag(c as Currency)
+                        }
                     }
                 }
+
                 Section("Тип") {
                     Toggle("Разовый", isOn: $isOneOff)
                     if isOneOff {
@@ -44,11 +49,12 @@ struct AddIncomeView: View {
                         let amt = NSDecimalNumber(decimal: amount ?? 0).doubleValue
                         let kind: IncomeKind = isOneOff ? .oneOff(date: date, note: nil) : .recurring(rec)
                         let item = Income(title: title, amount: amt, currency: currency, kind: kind)
-                        appState.addIncome(item); dismiss()
-                    }.disabled(title.isEmpty || (amount ?? 0) == 0)
+                        appState.addIncome(item)
+                        dismiss()
+                    }
+                    .disabled(title.isEmpty || (amount ?? 0) == 0)
                 }
             }
         }
     }
 }
-
