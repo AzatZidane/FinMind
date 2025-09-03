@@ -17,7 +17,7 @@ struct AddIncomeView: View {
                 Section {
                     TextField("Название", text: $title)
                     MoneyTextField(value: $amount,
-                                   fractionDigits: currency.fractionDigits,
+                                   fractionDigits: app.fractionDigits(for: currency),
                                    groupingSeparator: ".",
                                    decimalSeparator: ",",
                                    placeholder: "0")

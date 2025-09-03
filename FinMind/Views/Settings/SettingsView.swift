@@ -6,22 +6,29 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                // MARK: Отображение
                 Section("Отображение") {
                     Toggle("Показывать копейки", isOn: $app.useCents)
+
                     Picker("Тема", selection: $app.appearance) {
-                        ForEach(AppAppearance.allCases) { ap in
-                            Text(ap.title).tag(ap)
+                        // ВАЖНО: id: \.self и явный тип в .tag
+                        ForEach(AppAppearance.allCases, id: \.self) { ap in
+                            Text(ap.title).tag(ap as AppAppearance)
                         }
                     }
                     .pickerStyle(.segmented)
                 }
 
+                // MARK: Валюта
                 Section("Валюта") {
                     Picker("Базовая валюта", selection: $app.baseCurrency) {
-                        ForEach(Currency.supported) { Text("\($0.code) \($0.symbol)").tag($0) }
+                        ForEach(Currency.supported) { c in
+                            Text("\(c.code) \(c.symbol)").tag(c)
+                        }
                     }
                 }
 
+                // MARK: Курсы
                 Section("Курсы (демо)") {
                     HStack {
                         Text("Обновлено")
@@ -34,6 +41,7 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: Бэкап
                 Section("Резервная копия") {
                     NavigationLink {
                         BackupView().environmentObject(app)
