@@ -11,6 +11,7 @@ struct SettingsView: View {
                     Toggle("Показывать копейки", isOn: $app.useCents)
 
                     Picker("Тема", selection: $app.appearance) {
+                        // Жёсткая типизация: id и tag с точным типом
                         ForEach(AppAppearance.allCases, id: \.self) { ap in
                             Text(ap.title).tag(ap as AppAppearance)
                         }
@@ -21,23 +22,29 @@ struct SettingsView: View {
                 // MARK: Валюта
                 Section("Валюта") {
                     Picker("Базовая валюта", selection: $app.baseCurrency) {
+                        // Жёсткая типизация: id и tag с точным типом Currency
                         ForEach(Currency.supported, id: \.code) { c in
                             Text("\(c.code) \(c.symbol)").tag(c as Currency)
                         }
                     }
                 }
 
-                // MARK: Курсы
-                Section("Курсы (демо)") {
-                    HStack {
-                        Text("Обновлено")
-                        Spacer()
-                        Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
-                            .foregroundStyle(.secondary)
+                // MARK: Курсы (демо)
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Обновлено")
+                            Spacer()
+                            Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Button("Обновить курсы") {
+                            Task { await app.updateRates() }
+                        }
                     }
-                    Button("Обновить курсы") {
-                        Task { await app.updateRates() }
-                    }
+                } header: {
+                    Text("Курсы (демо)")
                 }
 
                 // MARK: Бэкап
