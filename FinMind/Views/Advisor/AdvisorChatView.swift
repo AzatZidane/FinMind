@@ -3,57 +3,77 @@ import SwiftUI
 struct AdvisorChatView: View {
     @EnvironmentObject var app: AppState
     @StateObject private var vm = ChatVM()
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 ScrollViewReader { proxy in
-                    // iOS 17+: новая сигнатура onChange; для более старых оставлен старый вариант
-                    if #available(iOS 17.0, *) {
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 12) {
-                                ForEach(Array(vm.messages.enumerated()), id: \.offset) { idx, msg in
-                                    bubble(for: msg).id(idx)
-                                }
-                                if vm.isStreaming { ProgressView().padding(.leading, 8) }
+                    // Лента сообщений
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            ForEach(Array(vm.messages.enumerated()), id: \.offset) { idx, msg in
+                                bubble(for: msg).id(idx)
                             }
-                            .padding(12)
+                            if vm.isStreaming { ProgressView().padding(.leading, 8) }
                         }
-                        .onChange(of: vm.messages.count) { _, _ in
-                            withAnimation { proxy.scrollTo(vm.messages.count - 1, anchor: .bottom) }
-                        }
-                    } else {
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 12) {
-                                ForEach(Array(vm.messages.enumerated()), id: \.offset) { idx, msg in
-                                    bubble(for: msg).id(idx)
-                                }
-                                if vm.isStreaming { ProgressView().padding(.leading, 8) }
-                            }
-                            .padding(12)
-                        }
-                        .onChange(of: vm.messages.count) { _ in
-                            withAnimation { proxy.scrollTo(vm.messages.count - 1, anchor: .bottom) }
-                        }
+                        .padding(12)
+                    }
+                    // Скрытие клавиатуры жестом прокрутки (iOS 16+) и тапом
+                    .background(Color.clear.contentShape(Rectangle())
+                        .onTapGesture { isInputFocused = false })
+                    .applyScrollDismissKeyboardIfAvailable()
+
+                    // Автоскролл к последнему сообщению
+                    .onChangeCompat(of: vm.messages.count) {
+                        withAnimation { proxy.scrollTo(vm.messages.count - 1, anchor: .bottom) }
                     }
                 }
 
                 Divider()
 
+                // Панель ввода
                 HStack(spacing: 8) {
                     TextField("Спросите про бюджет, долги, подушку…", text: $vm.input, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(1...3)
+                        .focused($isInputFocused)
+                        .submitLabel(.send)
+                        .onSubmit { Task { await vm.send(app: app); isInputFocused = false } }
+
+                    // Кнопка "Скрыть клавиатуру" рядом с инпутом
+                    if isInputFocused {
+                        Button {
+                            isInputFocused = false
+                        } label: {
+                            Image(systemName: "keyboard.chevron.compact.down")
+                        }
+                        .buttonStyle(.bordered)
+                    }
 
                     Button {
                         Task { await vm.send(app: app) }
-                    } label: { Image(systemName: "paperplane.fill") }
+                        isInputFocused = false
+                    } label: {
+                        Image(systemName: "paperplane.fill")
+                    }
                     .disabled(vm.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isStreaming)
                 }
                 .padding(12)
             }
             .navigationTitle("Чат с советником")
             .toolbar {
+                // Кнопка "Скрыть" на панели клавиатуры
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button {
+                        isInputFocused = false
+                    } label: {
+                        Label("Скрыть", systemImage: "keyboard.chevron.compact.down")
+                    }
+                }
+
+                // Меню действий
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(role: .destructive) {
@@ -85,7 +105,7 @@ struct AdvisorChatView: View {
     }
 }
 
-// MARK: - ViewModel
+// MARK: - ViewModel (как было)
 
 final class ChatVM: ObservableObject {
     @Published var messages: [ChatMessage]
@@ -135,8 +155,6 @@ final class ChatVM: ObservableObject {
         let context: [ChatMessage] = [systemMessage(app: app)] + messages + [userMsg]
 
         messages.append(userMsg)
-
-        // Пустой ответ ассистента (будем дописывать токенами)
         isStreaming = true
         messages.append(.init(role: .assistant, content: ""))
 
@@ -169,5 +187,29 @@ final class ChatVM: ObservableObject {
     func clearChat() {
         messages.removeAll()
         storage.clear()
+    }
+}
+
+// MARK: - Утилиты для совместимости iOS 16/17
+
+private extension View {
+    /// iOS 16+: скрывает клавиатуру при прокрутке; на iOS 15 просто возвращает self
+    @ViewBuilder
+    func applyScrollDismissKeyboardIfAvailable() -> some View {
+        if #available(iOS 16.0, *) {
+            self.scrollDismissesKeyboard(.interactively)
+        } else {
+            self
+        }
+    }
+
+    /// Единая onChange-обёртка: iOS17 — новая сигнатура, iOS16 — старая
+    @ViewBuilder
+    func onChangeCompat<Value: Equatable>(of value: Value, perform action: @escaping () -> Void) -> some View {
+        if #available(iOS 17.0, *) {
+            self.onChange(of: value) { _, _ in action() }
+        } else {
+            self.onChange(of: value) { _ in action() }
+        }
     }
 }
