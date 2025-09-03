@@ -3,18 +3,28 @@ import SwiftUI
 struct BudgetView: View {
     @EnvironmentObject var app: AppState
 
+    // Листы добавления сущностей
     private enum SheetType: Identifiable { case income, expense, debt, goal; var id: Int { hashValue } }
     @State private var activeSheet: SheetType?
 
-    // Агрегаты
-    private var totalIncome: Double { app.incomes.reduce(0) { $0 + $1.amount } }
-    private var totalExpense: Double { app.expenses.reduce(0) { $0 + $1.amount } }
-    private var net: Double { totalIncome - totalExpense }
+    // Итоги в базовой валюте
+    private var totalIncomeBase: Double {
+        let sum: Decimal = app.incomes.reduce(0) { acc, inc in
+            acc + app.toBase(Decimal(inc.amount), from: inc.currency)
+        }
+        return NSDecimalNumber(decimal: sum).doubleValue
+    }
 
-    // Источники для списков
-    private var incomesList: [Income] { app.incomes }
-    private var expensesList: [Expense] { app.expenses }
+    private var totalExpenseBase: Double {
+        let sum: Decimal = app.expenses.reduce(0) { acc, exp in
+            acc + app.toBase(Decimal(exp.amount), from: exp.currency)
+        }
+        return NSDecimalNumber(decimal: sum).doubleValue
+    }
 
+    private var netBase: Double { totalIncomeBase - totalExpenseBase }
+
+    // MARK: - Body
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
@@ -24,7 +34,7 @@ struct BudgetView: View {
                     incomesSection
                     expensesSection
 
-                    if incomesList.isEmpty && expensesList.isEmpty {
+                    if app.incomes.isEmpty && app.expenses.isEmpty {
                         Section { Text("Пока нет данных").foregroundStyle(.secondary) }
                     }
                 }
@@ -32,6 +42,7 @@ struct BudgetView: View {
             .padding(.top, 8)
             .navigationTitle("Бюджет")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) { EditButton() }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button("Добавить доход")  { activeSheet = .income }
@@ -52,18 +63,28 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Итоги
+    // MARK: - Итоговая карточка
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack { Text("Доходы");  Spacer(); Text(totalIncome.asMoney).font(.headline.monospacedDigit()) }
-            HStack { Text("Расходы"); Spacer(); Text(totalExpense.asMoney).font(.headline.monospacedDigit()) }
+            HStack {
+                Text("Доходы")
+                Spacer()
+                Text(app.formatMoney(totalIncomeBase, currency: app.baseCurrency))
+                    .font(.headline.monospacedDigit())
+            }
+            HStack {
+                Text("Расходы")
+                Spacer()
+                Text(app.formatMoney(totalExpenseBase, currency: app.baseCurrency))
+                    .font(.headline.monospacedDigit())
+            }
             Divider()
             HStack {
                 Text("Итог").fontWeight(.semibold)
                 Spacer()
-                Text(net.asMoney)
+                Text(app.formatMoney(netBase, currency: app.baseCurrency))
                     .font(.headline.monospacedDigit())
-                    .foregroundStyle(net >= 0 ? .green : .red)
+                    .foregroundStyle(netBase >= 0 ? .green : .red)
             }
         }
         .padding(12)
@@ -74,26 +95,44 @@ struct BudgetView: View {
     // MARK: - Секции
     private var incomesSection: some View {
         Group {
-            if !incomesList.isEmpty {
-                Section {
-                    ForEach(Array(incomesList.enumerated()), id: \.offset) { _, inc in incomeRow(inc) }
-                    .onDelete { offsets in
-                        app.incomes.remove(atOffsets: offsets)   // свайп-влево — удалить
+            if !app.incomes.isEmpty {
+                Section("Доходы") {
+                    ForEach(app.incomes) { inc in
+                        incomeRow(inc)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    app.removeIncome(inc)
+                                } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
+                            }
                     }
-                } header: { Text("Доходы") }
+                    .onDelete { offsets in
+                        app.incomes.remove(atOffsets: offsets) // режим «Править»
+                    }
+                }
             }
         }
     }
 
     private var expensesSection: some View {
         Group {
-            if !expensesList.isEmpty {
-                Section {
-                    ForEach(Array(expensesList.enumerated()), id: \.offset) { _, exp in expenseRow(exp) }
-                    .onDelete { offsets in
-                        app.expenses.remove(atOffsets: offsets)
+            if !app.expenses.isEmpty {
+                Section("Расходы") {
+                    ForEach(app.expenses) { exp in
+                        expenseRow(exp)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    app.removeExpense(exp)
+                                } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
+                            }
                     }
-                } header: { Text("Расходы") }
+                    .onDelete { offsets in
+                        app.expenses.remove(atOffsets: offsets) // режим «Править»
+                    }
+                }
             }
         }
     }
@@ -103,12 +142,14 @@ struct BudgetView: View {
     private func incomeRow(_ inc: Income) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(inc.name)
+                Text(inc.name) // NameCompat -> title
                 Text("доход").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(inc.amount.asMoney).font(.headline.monospacedDigit())
+            Text(app.formatMoney(inc.amount, currency: inc.currency))
+                .font(.headline.monospacedDigit())
         }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -119,9 +160,13 @@ struct BudgetView: View {
                 Text("расход").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(exp.amount.asMoney).font(.headline.monospacedDigit())
+            Text(app.formatMoney(exp.amount, currency: exp.currency))
+                .font(.headline.monospacedDigit())
         }
+        .contentShape(Rectangle())
     }
 }
 
-#Preview { BudgetView().environmentObject(AppState()) }
+#Preview {
+    BudgetView().environmentObject(AppState())
+}
