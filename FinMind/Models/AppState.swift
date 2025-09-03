@@ -160,6 +160,10 @@ final class AppState: ObservableObject, Codable {
     func formatMoney(_ amount: Double, currency: Currency? = nil) -> String {
         let c = currency ?? baseCurrency
         let digits = fractionDigits(for: c)
+
+        // Глушим NaN/±inf, чтобы они не ушли дальше в UI
+        let safe = amount.isFinite ? amount : 0
+
         let nf = NumberFormatter()
         nf.numberStyle = .decimal
         nf.usesGroupingSeparator = true
@@ -167,9 +171,10 @@ final class AppState: ObservableObject, Codable {
         nf.decimalSeparator = ","
         nf.minimumFractionDigits = digits
         nf.maximumFractionDigits = digits
-        let s = nf.string(from: Decimal(amount) as NSDecimalNumber) ?? "0"
+        let s = nf.string(from: Decimal(safe) as NSDecimalNumber) ?? "0"
         return "\(s) \(c.symbol)"
     }
+
 
     func toBase(_ amount: Decimal, from currency: Currency) -> Decimal {
         rates.convert(amount: amount, from: currency, to: baseCurrency) ?? 0
