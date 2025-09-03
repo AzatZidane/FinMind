@@ -25,7 +25,7 @@ struct AddIncomeView: View {
 
                     Picker("Валюта", selection: $currency) {
                         ForEach(Currency.supported, id: \.code) { c in
-                            Text("\(c.code) \n\(c.symbol)").tag(c as Currency)
+                            Text("\(c.code) \(c.symbol)").tag(c as Currency)
                         }
                     }
                 }

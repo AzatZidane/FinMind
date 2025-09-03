@@ -15,10 +15,10 @@ struct AddExpenseView: View {
                 TextField("Название", text: $title)
 
                 MoneyTextField(value: $amount,
-                               fractionDigits: appState.fractionDigits(for: currency),
-                               groupingSeparator: ".",
-                               decimalSeparator: ",",
-                               placeholder: "0")
+                                fractionDigits: appState.fractionDigits(for: currency),
+                                groupingSeparator: ".",
+                                decimalSeparator: ",",
+                                placeholder: "0")
 
                 Picker("Валюта", selection: $currency) {
                     ForEach(Currency.supported, id: \.code) { c in
