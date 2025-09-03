@@ -11,7 +11,6 @@ struct SettingsView: View {
                     Toggle("Показывать копейки", isOn: $app.useCents)
 
                     Picker("Тема", selection: $app.appearance) {
-                        // Явно задаём id и тип тега — это важно для вывода типов
                         ForEach(AppAppearance.allCases, id: \.self) { ap in
                             Text(ap.title).tag(ap as AppAppearance)
                         }
@@ -22,7 +21,6 @@ struct SettingsView: View {
                 // MARK: Валюта
                 Section("Валюта") {
                     Picker("Базовая валюта", selection: $app.baseCurrency) {
-                        // Критичный фикс: id и tag с точным типом Currency
                         ForEach(Currency.supported, id: \.code) { c in
                             Text("\(c.code) \(c.symbol)").tag(c as Currency)
                         }
