@@ -11,7 +11,6 @@ struct SettingsView: View {
                     Toggle("Показывать копейки", isOn: $app.useCents)
 
                     Picker("Тема", selection: $app.appearance) {
-                        // Жёсткая типизация: id и tag с точным типом
                         ForEach(AppAppearance.allCases, id: \.self) { ap in
                             Text(ap.title).tag(ap as AppAppearance)
                         }
@@ -22,7 +21,6 @@ struct SettingsView: View {
                 // MARK: Валюта
                 Section("Валюта") {
                     Picker("Базовая валюта", selection: $app.baseCurrency) {
-                        // Жёсткая типизация: id и tag с точным типом Currency
                         ForEach(Currency.supported, id: \.code) { c in
                             Text("\(c.code) \(c.symbol)").tag(c as Currency)
                         }
@@ -40,7 +38,8 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Button("Обновить курсы") {
-                            Task { await app.updateRates() }
+                            // В демо просто отметим время последнего обновления
+                            app.rates.updatedAt = Date()
                         }
                     }
                 } header: {
