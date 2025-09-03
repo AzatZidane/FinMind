@@ -6,18 +6,19 @@ struct BackupView: View {
 
     // Экспорт
     @State private var isExporting = false
-    @State private var exportDoc: BackupDocument = .init(data: Data())
+    @State private var exportDoc = BackupDocument(data: Data())
 
     // Импорт
     @State private var isImporting = false
 
     // Алёрт
-    @State private var alert: AlertItem?
+    @State private var alert: BackupAlert?
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Резервная копия") {
+                // ===== РЕЗЕРВНАЯ КОПИЯ =====
+                Section {
                     Button {
                         do {
                             let data = try BackupService.shared.makeJSON(from: app)
@@ -30,24 +31,27 @@ struct BackupView: View {
                     } label: {
                         Label("Экспорт в JSON…", systemImage: "square.and.arrow.up")
                     }
-                    .fileExporter(isPresented: $isExporting,
-                                  document: exportDoc,
-                                  contentType: .json,
-                                  defaultFilename: defaultFilename(),
-                                  onCompletion: { result in
+                    .fileExporter(
+                        isPresented: $isExporting,
+                        document: exportDoc,
+                        contentType: .json,
+                        defaultFilename: defaultFilename()
+                    ) { result in
                         if case .failure(let error) = result {
                             alert = .init(title: "Ошибка экспорта", message: error.localizedDescription)
                         }
-                    })
+                    }
 
                     Button {
                         isImporting = true
                     } label: {
                         Label("Восстановить из файла…", systemImage: "square.and.arrow.down")
                     }
-                    .fileImporter(isPresented: $isImporting,
-                                  allowedContentTypes: [.json],
-                                  allowsMultipleSelection: false) { result in
+                    .fileImporter(
+                        isPresented: $isImporting,
+                        allowedContentTypes: [.json],
+                        allowsMultipleSelection: false
+                    ) { result in
                         do {
                             let url = try result.get()
                             try importFromURL(url)
@@ -55,20 +59,27 @@ struct BackupView: View {
                             alert = .init(title: "Ошибка восстановления", message: error.localizedDescription)
                         }
                     }
+                } header: {
+                    Text("Резервная копия")
                 }
 
-                Section("Примечание") {
+                // ===== ПРИМЕЧАНИЕ =====
+                Section {
                     Text("""
 Экспорт включает доходы, расходы, долги, цели, «запас», валюты и настройки отображения.
 Восстановление перезапишет текущее состояние. Перед восстановлением рекомендуется сделать экспорт текущего состояния.
 """)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                } header: {
+                    Text("Примечание")
                 }
             }
             .navigationTitle("Резервная копия")
             .alert(item: $alert) { a in
-                Alert(title: Text(a.title), message: Text(a.message), dismissButton: .default(Text("OK")))
+                Alert(title: Text(a.title),
+                      message: Text(a.message),
+                      dismissButton: .default(Text("OK")))
             }
         }
     }
@@ -82,7 +93,7 @@ struct BackupView: View {
     }
 
     private func importFromURL(_ url: URL) throws {
-        // ВАЖНО: открыть security-scoped доступ, иначе будет permission error
+        // ВАЖНО: открыть security‑scoped доступ, иначе получим "don’t have permission to view it"
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
@@ -95,7 +106,7 @@ struct BackupView: View {
 
 // MARK: - Вспомогательные типы
 
-private struct AlertItem: Identifiable {
+private struct BackupAlert: Identifiable {
     let id = UUID()
     let title: String
     let message: String
