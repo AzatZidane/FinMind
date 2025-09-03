@@ -98,6 +98,7 @@ private struct ChartsScreen: View {
                         )
                         .foregroundStyle(by: .value("Серия", p.series.rawValue))
                         .interpolationMethod(.catmullRom)
+
                         PointMark(
                             x: .value("Период", p.date, unit: xAxisUnit),
                             y: .value("Сумма", p.value)
@@ -108,19 +109,21 @@ private struct ChartsScreen: View {
                 .chartXAxis {
                     switch bucket {
                     case .month:
-                        AxisMarks(values: .stride(by: .month)) { value in
+                        AxisMarks(values: .stride(by: .month)) { _ in
                             AxisGridLine()
                             AxisTick()
-                            if let date = value.as(Date.self) {
-                                AxisValueLabel(date, format: .dateTime.month(.abbreviated))
-                            }
+                            // ✅ Правильный вариант для дат: только format:
+                            AxisValueLabel(format: .dateTime.month(.abbreviated))
                         }
                     case .quarter:
                         AxisMarks(values: .stride(by: .quarter)) { value in
                             AxisGridLine()
                             AxisTick()
+                            // ✅ Для квартала формируем подпись вручную
                             if let date = value.as(Date.self) {
-                                AxisValueLabel(quarterLabel(date))
+                                AxisValueLabel {
+                                    Text(quarterLabel(date))
+                                }
                             }
                         }
                     }
@@ -177,7 +180,8 @@ private struct ChartsScreen: View {
 
     private var months: [Date] {
         let cal = Calendar.current
-        let now = cal.date(from: cal.dateComponents([.year, .month], from: Date()))! // начало текущего месяца
+        // начало текущего месяца
+        let now = cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
         return (0..<range.rawValue).reversed().compactMap { i in
             cal.date(byAdding: .month, value: -i, to: now)
         }
@@ -185,9 +189,7 @@ private struct ChartsScreen: View {
 
     private var quarters: [Date] {
         // начало кварталов за выбранный горизонт
-        let cal = Calendar.current
-        let m = months
-        let starts = m.map { startOfQuarter(for: $0) }
+        let starts = months.map { startOfQuarter(for: $0) } // removed unused 'cal'
         // уникальные, по порядку
         var uniq: [Date] = []
         for d in starts where uniq.last != d { uniq.append(d) }
@@ -243,7 +245,7 @@ private struct ChartsScreen: View {
     // MARK: - Calculations (в базовой валюте)
 
     private func monthlyIncomeBase(for month: Date) -> Double {
-        let rec = app.totalNormalizedMonthlyRecurringIncome(for: month) // уже в базе (мы меняли AppState раньше)
+        let rec = app.totalNormalizedMonthlyRecurringIncome(for: month)
         // разовые доходы в пределах месяца
         let cal = Calendar.current
         let oneOff: Decimal = app.incomes.reduce(0) { acc, i in
