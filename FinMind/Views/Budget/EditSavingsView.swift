@@ -3,17 +3,41 @@ import SwiftUI
 struct EditSavingsView: View {
     @ObservedObject var store: SavingsStore = .shared
 
+    // какие валюты показывать в UI (можно расширить при желании)
+    private var fiatList: [Currency] {
+        let wanted = Set(["RUB","USD","EUR","CNY","TRY"])
+        return Currency.supported.filter { wanted.contains($0.code.uppercased()) }
+    }
+
     var body: some View {
         Form {
+            Section("Фиат (сумма в валюте)") {
+                ForEach(fiatList, id: \.code) { c in
+                    HStack {
+                        Text("\(c.code) \(c.symbol)")
+                        Spacer()
+                        DecimalField(
+                            value: store.binding(for: c),
+                            fractionDigits: 2,
+                            width: 140
+                        )
+                    }
+                }
+            }
+
             Section("Криптовалюта (количество)") {
                 ForEach(CryptoAsset.allCases) { asset in
                     HStack {
                         Text(asset.title)
                         Spacer()
-                        DecimalField(value: Binding(
-                            get: { store.cryptoHoldings[asset] ?? 0 },
-                            set: { store.cryptoHoldings[asset] = $0 }
-                        ), fractionDigits: 8, width: 140)
+                        DecimalField(
+                            value: Binding(
+                                get: { store.cryptoHoldings[asset] ?? 0 },
+                                set: { store.cryptoHoldings[asset] = $0 }
+                            ),
+                            fractionDigits: 8,
+                            width: 140
+                        )
                     }
                 }
             }
@@ -23,23 +47,27 @@ struct EditSavingsView: View {
                     HStack {
                         Text(m.title)
                         Spacer()
-                        DecimalField(value: Binding(
-                            get: { store.metalGrams[m] ?? 0 },
-                            set: { store.metalGrams[m] = $0 }
-                        ), fractionDigits: 2, width: 120)
+                        DecimalField(
+                            value: Binding(
+                                get: { store.metalGrams[m] ?? 0 },
+                                set: { store.metalGrams[m] = $0 }
+                            ),
+                            fractionDigits: 2,
+                            width: 140
+                        )
                     }
                 }
             }
 
             Section {
-                Button("Сбросить значения", role: .destructive) { store.reset() }
+                Button("Сбросить все значения", role: .destructive) { store.reset() }
             }
         }
         .navigationTitle("Сбережения")
     }
 }
 
-/// Компактное числовое поле (без валютных символов)
+/// Компактное числовое поле (без валютных символов); локальный helper.
 private struct DecimalField: View {
     @Binding var value: Double
     let fractionDigits: Int
@@ -52,7 +80,7 @@ private struct DecimalField: View {
             get: { text.isEmpty ? format(value) : text },
             set: { new in
                 text = new
-                value = parse(new) ?? value
+                if let v = parse(new) { value = v }
             }
         ))
         .keyboardType(.decimalPad)
@@ -70,9 +98,9 @@ private struct DecimalField: View {
         nf.maximumFractionDigits = fractionDigits
         return nf.string(from: NSNumber(value: v)) ?? "0"
     }
-
     private func parse(_ s: String) -> Double? {
-        let ds = s.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: ",", with: ".")
+        let ds = s.replacingOccurrences(of: " ", with: "")
+                   .replacingOccurrences(of: ",", with: ".")
         return Double(ds)
     }
 }
