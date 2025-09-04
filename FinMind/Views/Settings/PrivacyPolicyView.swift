@@ -32,4 +32,5 @@ struct PrivacyPolicyView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
 #Preview { PrivacyPolicyView() }
