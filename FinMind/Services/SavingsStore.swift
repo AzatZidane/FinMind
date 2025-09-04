@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI // ← нужно для Binding
 
 // Поддерживаемые криптоактивы
 enum CryptoAsset: String, CaseIterable, Identifiable, Codable {
@@ -27,6 +28,7 @@ enum CryptoAsset: String, CaseIterable, Identifiable, Codable {
         case .ton: return "Toncoin (TON)"
         }
     }
+    /// ID в CoinGecko
     var coingeckoID: String {
         switch self {
         case .btc: return "bitcoin"
@@ -54,7 +56,7 @@ enum MetalAsset: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-// Быстрый доступ к валюте по коду
+// Быстрый доступ к валюте по коду (если понадобится в интерфейсе)
 extension Currency {
     static func by(code: String) -> Currency? {
         Currency.supported.first { $0.code.uppercased() == code.uppercased() }
@@ -66,7 +68,7 @@ final class SavingsStore: ObservableObject {
 
     // Публичные данные
     @Published var cryptoHoldings: [CryptoAsset: Double]   // количество монет
-    @Published var metalGrams: [MetalAsset: Double]        // граммы металлов
+    @Published var metalGrams:    [MetalAsset: Double]     // граммы металлов
     // Фиат: сумма в валюте, ключ — код валюты (EUR, USD, RUB, ...)
     @Published private(set) var fiat: [String: Double]
 
@@ -74,23 +76,31 @@ final class SavingsStore: ObservableObject {
     private let ud = UserDefaults.standard
 
     private init() {
-        // CRYPTO
+        // ---- CRYPTO ----
         if let data = ud.data(forKey: "savings.crypto"),
-           let decoded = try? JSONDecoder().decode([CryptoAsset: Double].self, from: data) {
-            cryptoHoldings = decoded
+           let decoded = try? JSONDecoder().decode([String: Double].self, from: data) {
+            var dict: [CryptoAsset: Double] = [:]
+            for (k, v) in decoded {
+                if let a = CryptoAsset(rawValue: k) { dict[a] = v }
+            }
+            cryptoHoldings = dict
         } else {
             cryptoHoldings = Dictionary(uniqueKeysWithValues: CryptoAsset.allCases.map { ($0, 0) })
         }
 
-        // METALS
+        // ---- METALS ----
         if let data = ud.data(forKey: "savings.metals"),
-           let decoded = try? JSONDecoder().decode([MetalAsset: Double].self, from: data) {
-            metalGrams = decoded
+           let decoded = try? JSONDecoder().decode([String: Double].self, from: data) {
+            var dict: [MetalAsset: Double] = [:]
+            for (k, v) in decoded {
+                if let m = MetalAsset(rawValue: k) { dict[m] = v }
+            }
+            metalGrams = dict
         } else {
             metalGrams = Dictionary(uniqueKeysWithValues: MetalAsset.allCases.map { ($0, 0) })
         }
 
-        // FIAT (храним как [код: сумма])
+        // ---- FIAT ---- (храним как [код: сумма])
         if let data = ud.data(forKey: "savings.fiat"),
            let decoded = try? JSONDecoder().decode([String: Double].self, from: data) {
             fiat = decoded
@@ -100,11 +110,12 @@ final class SavingsStore: ObservableObject {
             fiat = Dictionary(uniqueKeysWithValues: defaultCodes.map { ($0, 0.0) })
         }
 
-        // Автосохранение
+        // Автосохранение (в строковые ключи, чтобы JSON точно корректно кодировался)
         $cryptoHoldings
             .sink { [weak self] dict in
                 guard let self = self else { return }
-                if let data = try? JSONEncoder().encode(dict) {
+                let asString = Dictionary(uniqueKeysWithValues: dict.map { ($0.key.rawValue, $0.value) })
+                if let data = try? JSONEncoder().encode(asString) {
                     self.ud.set(data, forKey: "savings.crypto")
                 }
             }
@@ -113,7 +124,8 @@ final class SavingsStore: ObservableObject {
         $metalGrams
             .sink { [weak self] dict in
                 guard let self = self else { return }
-                if let data = try? JSONEncoder().encode(dict) {
+                let asString = Dictionary(uniqueKeysWithValues: dict.map { ($0.key.rawValue, $0.value) })
+                if let data = try? JSONEncoder().encode(asString) {
                     self.ud.set(data, forKey: "savings.metals")
                 }
             }
@@ -129,8 +141,9 @@ final class SavingsStore: ObservableObject {
             .store(in: &cancellables)
     }
 
-    // MARK: Fiat Helpers
+    // MARK: - Fiat Helpers
 
+    /// Binding для редактирования суммы конкретной валюты (в UI).
     func binding(for currency: Currency) -> Binding<Double> {
         let code = currency.code.uppercased()
         return Binding<Double>(
@@ -139,7 +152,7 @@ final class SavingsStore: ObservableObject {
         )
     }
 
-    /// Какие коды валют стоит запросить у сервиса
+    /// Какие фиат‑коды стоит запросить у сервиса курсов.
     func fiatCodesToFetch() -> [String] {
         var codes = Set(fiat.keys.map { $0.uppercased() })
         codes.formUnion(["USD", "RUB"]) // обязательно
@@ -148,7 +161,7 @@ final class SavingsStore: ObservableObject {
 
     func reset() {
         for k in CryptoAsset.allCases { cryptoHoldings[k] = 0 }
-        for k in MetalAsset.allCases { metalGrams[k] = 0 }
-        for k in fiat.keys { fiat[k] = 0 }
+        for k in MetalAsset.allCases  { metalGrams[k]    = 0 }
+        for k in fiat.keys            { fiat[k]          = 0 }
     }
 }
