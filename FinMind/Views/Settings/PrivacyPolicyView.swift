@@ -1,34 +1,85 @@
 import SwiftUI
 
-struct PrivacyPolicyView: View {
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Политика конфиденциальности FinMind")
-                    .font(.title2)
-                    .bold()
+struct SettingsView: View {
+    @EnvironmentObject var app: AppState
+    @State private var showWipeAlert = false
 
-                Group {
-                    Text("Приложение **FinMind** собирает и обрабатывает только данные, необходимые для работы:")
-                    Text("— доходы, расходы, цели и долги, которые пользователь вводит вручную;")
-                    Text("— параметры профиля (аватар, никнейм, настройки темы).")
+    var body: some View {
+        NavigationStack {
+            List {
+                // MARK: Отображение
+                Section("Отображение") {
+                    Toggle("Показывать копейки", isOn: $app.useCents)
+
+                    Picker("Тема", selection: $app.appearance) {
+                        ForEach(AppAppearance.allCases, id: \.self) { ap in
+                            Text(ap.title).tag(ap as AppAppearance)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
 
-                Text("Данные хранятся локально на устройстве пользователя и могут синхронизироваться через iCloud (если включено).")
+                // MARK: Валюта
+                Section("Валюта") {
+                    Picker("Базовая валюта", selection: $app.baseCurrency) {
+                        ForEach(Currency.supported, id: \.code) { c in
+                            Text("\(c.code) \(c.symbol)").tag(c as Currency)
+                        }
+                    }
+                }
 
-                Text("Для работы советника запросы передаются на сервер-прокси FinMind, который использует технологию OpenAI. Персональные данные (ФИО, контакты и т.п.) не собираются и не передаются.")
+                // MARK: Курсы (демо)
+                Section("Курсы (демо)") {
+                    HStack {
+                        Text("Обновлено")
+                        Spacer()
+                        Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Button("Обновить курсы") {
+                        // Демоверсия: только отметка времени
+                        app.rates.updatedAt = Date()
+                    }
+                }
 
-                Text("Пользователь может в любой момент удалить все данные в настройках приложения.")
+                // MARK: Резервная копия
+                Section("Резервная копия") {
+                    NavigationLink {
+                        BackupView().environmentObject(app)
+                    } label: {
+                        Label("Экспорт/Импорт JSON", systemImage: "externaldrive.badge.icloud")
+                    }
+                }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Контакты разработчика:")
-                        .bold()
-                    Text("Email: ismagilovazat48@gmail.com")
+                // MARK: О приложении
+                Section("О приложении") {
+                    NavigationLink {
+                        PrivacyPolicyView()   // <— используем существующий файл
+                    } label: {
+                        Label("Политика конфиденциальности", systemImage: "doc.text.magnifyingglass")
+                    }
+
+                    Button(role: .destructive) {
+                        showWipeAlert = true
+                    } label: {
+                        Label("Удалить все данные…", systemImage: "trash")
+                    }
+                    .alert("Удалить все данные?", isPresented: $showWipeAlert) {
+                        Button("Отмена", role: .cancel) {}
+                        Button("Удалить", role: .destructive) {
+                            app.wipeAllData()
+                        }
+                    } message: {
+                        Text("Будут удалены все доходы, расходы, долги, цели, записи, сбережения, истории чатов и локальные настройки.")
+                    }
                 }
             }
-            .padding()
+            .navigationTitle("Настройки")
         }
-        .navigationTitle("Политика")
-        .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+#Preview {
+    SettingsView().environmentObject(AppState())
 }
