@@ -118,14 +118,16 @@ final class AppState: ObservableObject, Codable {
             $useCents.map { _ in () }.eraseToAnyPublisher(),     // новое
             $appearance.map { _ in () }.eraseToAnyPublisher()    // новое
         ]
+        // В AppState.startAutoSave()
         Publishers.MergeMany(updates)
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main) // можно 300–600
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                do { try Persistence.shared.save(self) }
-                catch { print("Persistence save error:", error.localizedDescription) }
+                // Сохраняем НЕ на главном потоке
+                Persistence.shared.saveAsync(self)
             }
             .store(in: &cancellables)
+
     }
 
     func forceSave() {
