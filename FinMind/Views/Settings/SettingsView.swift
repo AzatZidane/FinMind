@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
 
+    @State private var showWipeAlert = false
+    private let privacyURL = URL(string: "https://github.com/AzatZidane/FinMind/blob/main/PRIVACY.md")! 
+
     var body: some View {
         NavigationStack {
             List {
@@ -28,28 +31,48 @@ struct SettingsView: View {
                 }
 
                 // MARK: Курсы (демо)
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Обновлено")
-                            Spacer()
-                            Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        Button("Обновить курсы") {
-                            // Без асинхронщины — ничего не «залипнет»
-                            app.rates.updatedAt = Date()
-                        }
+                Section("Курсы (демо)") {
+                    HStack {
+                        Text("Обновлено")
+                        Spacer()
+                        Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
+                            .foregroundStyle(.secondary)
                     }
-                } header: { Text("Курсы (демо)") }
+                    Button("Обновить курсы") {
+                        // Демоверсия: отметим время обновления
+                        app.rates.updatedAt = Date()
+                    }
+                }
 
-                // MARK: Бэкап
+                // MARK: Резервная копия
                 Section("Резервная копия") {
                     NavigationLink {
                         BackupView().environmentObject(app)
                     } label: {
                         Label("Экспорт/Импорт JSON", systemImage: "externaldrive.badge.icloud")
+                    }
+                }
+
+                // MARK: О приложении
+                Section("О приложении") {
+                    NavigationLink {
+                        PrivacyPolicyView(url: privacyURL)
+                    } label: {
+                        Label("Политика конфиденциальности", systemImage: "doc.text.magnifyingglass")
+                    }
+
+                    Button(role: .destructive) {
+                        showWipeAlert = true
+                    } label: {
+                        Label("Удалить все данные…", systemImage: "trash")
+                    }
+                    .alert("Удалить все данные?", isPresented: $showWipeAlert) {
+                        Button("Отмена", role: .cancel) {}
+                        Button("Удалить", role: .destructive) {
+                            app.wipeAllData()
+                        }
+                    } message: {
+                        Text("Будут удалены все доходы, расходы, долги, цели, истории чатов и локальные настройки.")
                     }
                 }
             }
