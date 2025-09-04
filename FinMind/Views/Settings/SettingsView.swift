@@ -38,7 +38,7 @@ struct SettingsView: View {
                             .monospacedDigit()
                     }
                     Button("Обновить курсы") {
-                        // Демоверсия: только отметка времени
+                        // Демоверсия: просто отметим время
                         app.rates.updatedAt = Date()
                     }
                 }
@@ -68,49 +68,29 @@ struct SettingsView: View {
                     .alert("Удалить все данные?", isPresented: $showWipeAlert) {
                         Button("Отмена", role: .cancel) {}
                         Button("Удалить", role: .destructive) {
-                            app.wipeAllData()
+                            wipeAllData()
                         }
                     } message: {
-                        Text("Будут удалены все доходы, расходы, долги, цели, записи, сбережения, истории чатов и локальные настройки.")
+                        Text("Будут удалены все доходы, расходы, долги, цели, ежедневные записи, сбережения, история чатов и локальные настройки.")
                     }
                 }
             }
             .navigationTitle("Настройки")
         }
     }
-}
 
-// MARK: - Встроенная страница политики
-
-private struct PrivacyPolicyView: View {
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Политика конфиденциальности FinMind")
-                    .font(.title2).bold()
-
-                Group {
-                    Text("Приложение **FinMind** собирает и обрабатывает только данные, необходимые для работы приложения:")
-                    Text("• доходы, расходы, цели и долги, которые пользователь вводит вручную;")
-                    Text("• параметры профиля (аватар, никнейм, настройки темы и валюты);")
-                    Text("• при желании пользователя — данные «сбережений» (фиат/криптовалюта/металлы).")
-                }
-
-                Text("Данные хранятся **локально** на устройстве пользователя. Опционально они могут синхронизироваться через **iCloud** (если включено в настройках устройства).")
-
-                Text("Для работы ИИ-советника запросы передаются на сервер-прокси FinMind, который использует технологию OpenAI. Персональные данные (ФИО, контакты и т.п.) **не собираются и не передаются**.")
-
-                Text("Пользователь может в любой момент удалить все данные в приложении через раздел «Настройки» → «О приложении» → «Удалить все данные…».")
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Контакты разработчика:").bold()
-                    Text("Email: ismagilovazat48@gmail.com")
-                }
-            }
-            .padding()
-        }
-        .navigationTitle("Политика")
-        .navigationBarTitleDisplayMode(.inline)
+    // MARK: - Локальная очистка всех данных
+    private func wipeAllData() {
+        app.incomes.removeAll()
+        app.expenses.removeAll()
+        app.debts.removeAll()
+        app.goals.removeAll()
+        app.dailyEntries.removeAll()
+        app.reserves.removeAll()
+        app.rates.updatedAt = nil
+        // если используется история чатов
+        ChatStorage.shared.clear()
+        app.forceSave()
     }
 }
 
