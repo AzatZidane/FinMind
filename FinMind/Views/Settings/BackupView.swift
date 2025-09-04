@@ -35,12 +35,13 @@ struct BackupView: View {
                         isPresented: $isExporting,
                         document: exportDoc,
                         contentType: .json,
-                        defaultFilename: defaultFilename()
-                    ) { result in
-                        if case .failure(let error) = result {
-                            alert = .init(title: "Ошибка экспорта", message: error.localizedDescription)
+                        defaultFilename: defaultFilename(),
+                        onCompletion: { (result: Result<URL, Error>) in
+                            if case .failure(let error) = result {
+                                alert = .init(title: "Ошибка экспорта", message: error.localizedDescription)
+                            }
                         }
-                    }
+                    )
 
                     Button {
                         isImporting = true
@@ -50,15 +51,18 @@ struct BackupView: View {
                     .fileImporter(
                         isPresented: $isImporting,
                         allowedContentTypes: [.json],
-                        allowsMultipleSelection: false
-                    ) { result in
-                        do {
-                            let url = try result.get()
-                            try importFromURL(url)
-                        } catch {
-                            alert = .init(title: "Ошибка восстановления", message: error.localizedDescription)
+                        allowsMultipleSelection: false,
+                        onCompletion: { (result: Result<[URL], Error>) in
+                            do {
+                                let urls = try result.get()
+                                guard let url = urls.first else { return }
+                                try importFromURL(url)
+                                alert = .init(title: "Готово", message: "Данные успешно восстановлены.")
+                            } catch {
+                                alert = .init(title: "Ошибка восстановления", message: error.localizedDescription)
+                            }
                         }
-                    }
+                    )
                 } header: {
                     Text("Резервная копия")
                 }
@@ -93,14 +97,12 @@ struct BackupView: View {
     }
 
     private func importFromURL(_ url: URL) throws {
-        // ВАЖНО: открыть security‑scoped доступ, иначе получим "don’t have permission to view it"
+        // ВАЖНО: security‑scoped доступ, иначе Files вернёт "don't have permission to view it"
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
         let data = try Data(contentsOf: url, options: [.mappedIfSafe])
         try BackupService.shared.restore(from: data, into: app)
-
-        alert = .init(title: "Готово", message: "Данные успешно восстановлены.")
     }
 }
 
