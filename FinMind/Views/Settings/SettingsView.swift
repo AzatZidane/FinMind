@@ -2,9 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-
     @State private var showWipeAlert = false
-    private let privacyURL = URL(string: "https://github.com/AzatZidane/FinMind/blob/main/PRIVACY.md")! 
 
     var body: some View {
         NavigationStack {
@@ -37,9 +35,10 @@ struct SettingsView: View {
                         Spacer()
                         Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
                             .foregroundStyle(.secondary)
+                            .monospacedDigit()
                     }
                     Button("Обновить курсы") {
-                        // Демоверсия: отметим время обновления
+                        // Демоверсия: только отметка времени
                         app.rates.updatedAt = Date()
                     }
                 }
@@ -56,7 +55,7 @@ struct SettingsView: View {
                 // MARK: О приложении
                 Section("О приложении") {
                     NavigationLink {
-                        PrivacyPolicyView(url: privacyURL)
+                        PrivacyPolicyView()
                     } label: {
                         Label("Политика конфиденциальности", systemImage: "doc.text.magnifyingglass")
                     }
@@ -72,12 +71,46 @@ struct SettingsView: View {
                             app.wipeAllData()
                         }
                     } message: {
-                        Text("Будут удалены все доходы, расходы, долги, цели, истории чатов и локальные настройки.")
+                        Text("Будут удалены все доходы, расходы, долги, цели, записи, сбережения, истории чатов и локальные настройки.")
                     }
                 }
             }
             .navigationTitle("Настройки")
         }
+    }
+}
+
+// MARK: - Встроенная страница политики
+
+private struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Политика конфиденциальности FinMind")
+                    .font(.title2).bold()
+
+                Group {
+                    Text("Приложение **FinMind** собирает и обрабатывает только данные, необходимые для работы приложения:")
+                    Text("• доходы, расходы, цели и долги, которые пользователь вводит вручную;")
+                    Text("• параметры профиля (аватар, никнейм, настройки темы и валюты);")
+                    Text("• при желании пользователя — данные «сбережений» (фиат/криптовалюта/металлы).")
+                }
+
+                Text("Данные хранятся **локально** на устройстве пользователя. Опционально они могут синхронизироваться через **iCloud** (если включено в настройках устройства).")
+
+                Text("Для работы ИИ-советника запросы передаются на сервер-прокси FinMind, который использует технологию OpenAI. Персональные данные (ФИО, контакты и т.п.) **не собираются и не передаются**.")
+
+                Text("Пользователь может в любой момент удалить все данные в приложении через раздел «Настройки» → «О приложении» → «Удалить все данные…».")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Контакты разработчика:").bold()
+                    Text("Email: ismagilovazat48@gmail.com")
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Политика")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
