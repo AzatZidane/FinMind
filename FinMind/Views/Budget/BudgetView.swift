@@ -6,27 +6,28 @@ struct BudgetView: View {
     @State private var isLoadingRates = false
     @State private var ratesError: String?
 
+    // Редактирование
+    @State private var editingIncome: Income?
+    @State private var editingExpense: Expense?
+
     private enum SheetType: Identifiable { case income, expense, debt, goal; var id: Int { hashValue } }
     @State private var activeSheet: SheetType?
 
-    // текущий месяц — для сводки
     private var month: Date {
         let cal = Calendar.current
         return cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
     }
-
     private var totalIncomeBase: Double { monthlyIncomeBase(for: month) }
     private var totalExpenseBase: Double { monthlyExpenseBase(for: month) }
     private var netBase: Double { totalIncomeBase - totalExpenseBase }
 
-    // MARK: Body
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
                 summaryCard
 
                 List {
-                    savingsSection        // ← Новая секция «Сбережения»
+                    savingsSection
                     incomesSection
                     expensesSection
                     debtsSection
@@ -36,6 +37,7 @@ struct BudgetView: View {
                         Section { Text("Пока нет данных").foregroundStyle(.secondary) }
                     }
                 }
+                .transaction { $0.animation = nil } // меньше анимаций = быстрее
             }
             .padding(.top, 8)
             .navigationTitle("Бюджет")
@@ -59,10 +61,17 @@ struct BudgetView: View {
                 case .goal:    AddGoalView().environmentObject(app)
                 }
             }
+            // Редактирование
+            .sheet(item: $editingIncome) { inc in
+                EditIncomeView(income: inc).environmentObject(app)
+            }
+            .sheet(item: $editingExpense) { exp in
+                EditExpenseView(expense: exp).environmentObject(app)
+            }
         }
     }
 
-    // MARK: - Секция «Сбережения»
+    // MARK: - Сбережения
     private var savingsSection: some View {
         Section("Сбережения") {
             HStack {
@@ -83,12 +92,11 @@ struct BudgetView: View {
             }
 
             if let e = ratesError {
-                Text(e).foregroundStyle(.red).font(.footnote)
+                Text("Не удалось обновить курсы. ") +
+                Text(e).foregroundStyle(.secondary)
             }
 
-            NavigationLink {
-                EditSavingsView()
-            } label: {
+            NavigationLink { EditSavingsView() } label: {
                 Label("Редактировать сбережения", systemImage: "pencil")
             }
 
@@ -103,10 +111,9 @@ struct BudgetView: View {
             }
             .disabled(isLoadingRates)
         }
-        .transaction { $0.animation = nil } // без анимаций, быстрее
     }
 
-    // MARK: - Итоговая карточка (месяц)
+    // MARK: - Итоги
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack { Text("Доходы (мес.)"); Spacer()
@@ -131,65 +138,96 @@ struct BudgetView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Разделы доходов/расходов/долгов/целей (ваши прошлые)
+    // MARK: - Разделы
     private var incomesSection: some View {
         Group {
             if !app.incomes.isEmpty {
                 Section("Доходы") {
                     ForEach(app.incomes) { inc in
-                        incomeRow(inc).swipeActions {
-                            Button(role: .destructive) { app.removeIncome(inc) } label: {
-                                Label("Удалить", systemImage: "trash")
+                        incomeRow(inc)
+                            .contextMenu {
+                                Button { editingIncome = inc } label: {
+                                    Label("Редактировать", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) { app.removeIncome(inc) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
                             }
-                        }
+                            .swipeActions {
+                                Button { editingIncome = inc } label: {
+                                    Label("Редакт.", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                                Button(role: .destructive) { app.removeIncome(inc) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
+                            }
                     }
                     .onDelete { app.incomes.remove(atOffsets: $0) }
                 }
             }
         }
     }
+
     private var expensesSection: some View {
         Group {
             if !app.expenses.isEmpty {
                 Section("Расходы") {
                     ForEach(app.expenses) { exp in
-                        expenseRow(exp).swipeActions {
-                            Button(role: .destructive) { app.removeExpense(exp) } label: {
-                                Label("Удалить", systemImage: "trash")
+                        expenseRow(exp)
+                            .contextMenu {
+                                Button { editingExpense = exp } label: {
+                                    Label("Редактировать", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) { app.removeExpense(exp) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
                             }
-                        }
+                            .swipeActions {
+                                Button { editingExpense = exp } label: {
+                                    Label("Редакт.", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                                Button(role: .destructive) { app.removeExpense(exp) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
+                            }
                     }
                     .onDelete { app.expenses.remove(atOffsets: $0) }
                 }
             }
         }
     }
+
     private var debtsSection: some View {
         Group {
             if !app.debts.isEmpty {
                 Section("Долги") {
                     ForEach(app.debts) { d in
-                        debtRow(d).swipeActions {
-                            Button(role: .destructive) { app.removeDebt(d) } label: {
-                                Label("Удалить", systemImage: "trash")
+                        debtRow(d)
+                            .swipeActions {
+                                Button(role: .destructive) { app.removeDebt(d) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
                             }
-                        }
                     }
                     .onDelete { app.debts.remove(atOffsets: $0) }
                 }
             }
         }
     }
+
     private var goalsSection: some View {
         Group {
             if !app.goals.isEmpty {
                 Section("Цели") {
                     ForEach(app.goals) { g in
-                        goalRow(g).swipeActions {
-                            Button(role: .destructive) { app.removeGoal(g) } label: {
-                                Label("Удалить", systemImage: "trash")
+                        goalRow(g)
+                            .swipeActions {
+                                Button(role: .destructive) { app.removeGoal(g) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
                             }
-                        }
                     }
                     .onDelete { app.goals.remove(atOffsets: $0) }
                 }
@@ -209,7 +247,6 @@ struct BudgetView: View {
                 .font(.headline.monospacedDigit())
         }
     }
-
     @ViewBuilder private func expenseRow(_ exp: Expense) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -221,7 +258,6 @@ struct BudgetView: View {
                 .font(.headline.monospacedDigit())
         }
     }
-
     @ViewBuilder private func debtRow(_ d: Debt) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -233,7 +269,6 @@ struct BudgetView: View {
                 .font(.headline.monospacedDigit())
         }
     }
-
     @ViewBuilder private func goalRow(_ g: Goal) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -250,12 +285,18 @@ struct BudgetView: View {
 
     // MARK: - Helpers (месяц)
     private func kindText(_ k: IncomeKind) -> String {
-        switch k { case .recurring(let r): return r.localized
-        case .oneOff(let d, _): return "Разовый, " + d.formatted(.dateTime.day().month().year()) }
+        switch k {
+        case .recurring(let r): return r.localized
+        case .oneOff(let d, _): return "Разовый, " + d.formatted(.dateTime.day().month().year())
+        }
     }
     private func kindText(_ k: ExpenseKind) -> String {
-        switch k { case .recurring(let r): return r.localized
-        case .oneOff(let d, _): return "Разовый, " + (d?.formatted(.dateTime.day().month().year()) ?? "") }
+        switch k {
+        case .recurring(let r): return r.localized
+        case .oneOff(let d, _):
+            if let d { return "Разовый, " + d.formatted(.dateTime.day().month().year()) }
+            else { return "Разовый" }
+        }
     }
 
     private func monthlyIncomeBase(for month: Date) -> Double {
@@ -263,8 +304,7 @@ struct BudgetView: View {
         let cal = Calendar.current
         let oneOff: Decimal = app.incomes.reduce(0) { acc, i in
             guard case .oneOff(let d, _) = i.kind,
-                  cal.isDate(d, equalTo: month, toGranularity: .month)
-            else { return acc }
+                  cal.isDate(d, equalTo: month, toGranularity: .month) else { return acc }
             return acc + app.toBase(Decimal(i.amount), from: i.currency)
         }
         return rec + NSDecimalNumber(decimal: oneOff).doubleValue
@@ -274,8 +314,7 @@ struct BudgetView: View {
         let cal = Calendar.current
         let oneOff: Decimal = app.expenses.reduce(0) { acc, e in
             guard case .oneOff(let d, _) = e.kind,
-                  let d, cal.isDate(d, equalTo: month, toGranularity: .month)
-            else { return acc }
+                  let d, cal.isDate(d, equalTo: month, toGranularity: .month) else { return acc }
             return acc + app.toBase(Decimal(e.amount), from: e.currency)
         }
         total += NSDecimalNumber(decimal: oneOff).doubleValue
@@ -287,17 +326,31 @@ struct BudgetView: View {
         guard let r = rates else { return 0 }
         var total: Double = 0
 
-        // crypto
+        // FIAT: сумма в валюте -> RUB
+        for (code, amount) in SavingsStore.shared.fiat {
+            guard amount > 0 else { continue }
+            let c = code.uppercased()
+            if c == "RUB" {
+                total += amount
+            } else if c == "USD" {
+                total += amount * r.usdToRub
+            } else if let usdToCurr = r.fiatUSD[c], usdToCurr > 0 {
+                // 1 USD = usdToCurr currency -> 1 currency = 1/usdToCurr USD
+                total += amount * (r.usdToRub / usdToCurr)
+            }
+        }
+
+        // CRYPTO
         for (asset, qty) in SavingsStore.shared.cryptoHoldings {
             guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
             total += qty * usd * r.usdToRub
         }
-        // metals (граммы -> унции)
+
+        // METALS (граммы -> унции)
         let gPerOz = 31.1034768
         for (m, grams) in SavingsStore.shared.metalGrams {
             guard grams > 0, let usdPerOz = r.metalsUsd[m] else { continue }
-            let oz = grams / gPerOz
-            total += oz * usdPerOz * r.usdToRub
+            total += (grams / gPerOz) * usdPerOz * r.usdToRub
         }
         return total.isFinite ? total : 0
     }
@@ -317,14 +370,15 @@ struct BudgetView: View {
         isLoadingRates = true
         ratesError = nil
         do {
-            let snap = try await RatesService.shared.fetchAll()
+            let codes = SavingsStore.shared.fiatCodesToFetch()
+            let snap = try await RatesService.shared.fetchAll(fiatCodes: codes)
             await MainActor.run {
                 self.rates = snap
                 self.isLoadingRates = false
             }
         } catch {
             await MainActor.run {
-                self.ratesError = "Не удалось обновить курсы. Проверьте интернет."
+                self.ratesError = error.localizedDescription
                 self.isLoadingRates = false
             }
         }
