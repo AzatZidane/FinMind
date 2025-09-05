@@ -11,7 +11,6 @@ struct DiagnosticsView: View {
                 Text("Когда включено, приложение пишет тех. события в локальный файл (без персональных данных). Вы можете поделиться журналом со службой поддержки.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .padding(.top, 2)
             }
 
             Section("Журнал") {
@@ -23,21 +22,23 @@ struct DiagnosticsView: View {
                             .font(.system(.footnote, design: .monospaced))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                    }.frame(height: 300)
+                    }
+                    .frame(height: 300)
                 }
+
                 HStack {
-                    Button("Обновить") { logText = Log.shared.readTail() }
+                    Button("Обновить") { logText = AppLog.shared.readTail() }
                     Spacer()
-                    ShareLink("Поделиться…", item: Log.shared.currentFileURL())
+                    ShareLink("Поделиться…", item: AppLog.shared.currentFileURL())
                         .disabled(logText.isEmpty)
                     Button("Очистить", role: .destructive) {
-                        Log.shared.clear()
+                        AppLog.shared.clear()
                         logText = ""
                     }
                 }
             }
         }
         .navigationTitle("Диагностика")
-        .onAppear { logText = Log.shared.readTail() }
+        .onAppear { logText = AppLog.shared.readTail() }
     }
 }
