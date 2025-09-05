@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct EditSavingsView: View {
     @ObservedObject var store: SavingsStore = .shared
@@ -10,51 +11,52 @@ struct EditSavingsView: View {
     }
 
     var body: some View {
+        // В iOS 16+: позволяет закрыть клавиатуру жестом прокрутки
         Form {
-            Section("Фиат (сумма в валюте)") {
+            Section("ФИАТ (СУММА В ВАЛЮТЕ)") {
                 ForEach(fiatList, id: \.code) { c in
                     HStack {
                         Text("\(c.code) \(c.symbol)")
                         Spacer()
-                        DecimalField(
+                        DecimalFieldUIKit(
                             value: store.binding(for: c),
-                            fractionDigits: 2,
-                            width: 140
+                            fractionDigits: 2
                         )
+                        .frame(width: 140)
                     }
                 }
             }
 
-            Section("Криптовалюта (количество)") {
+            Section("КРИПТОВАЛЮТА (КОЛИЧЕСТВО)") {
                 ForEach(CryptoAsset.allCases) { asset in
                     HStack {
                         Text(asset.title)
                         Spacer()
-                        DecimalField(
+                        DecimalFieldUIKit(
                             value: Binding(
                                 get: { store.cryptoHoldings[asset] ?? 0 },
                                 set: { store.cryptoHoldings[asset] = $0 }
                             ),
-                            fractionDigits: 8,
-                            width: 140
+                            fractionDigits: 8
                         )
+                        .frame(width: 140)
                     }
                 }
             }
 
-            Section("Драгоценные металлы (граммы)") {
+            Section("ДРАГОЦЕННЫЕ МЕТАЛЛЫ (ГРАММЫ)") {
                 ForEach(MetalAsset.allCases) { m in
                     HStack {
                         Text(m.title)
                         Spacer()
-                        DecimalField(
+                        DecimalFieldUIKit(
                             value: Binding(
                                 get: { store.metalGrams[m] ?? 0 },
                                 set: { store.metalGrams[m] = $0 }
                             ),
-                            fractionDigits: 2,
-                            width: 140
+                            fractionDigits: 2
                         )
+                        .frame(width: 140)
                     }
                 }
             }
@@ -64,56 +66,131 @@ struct EditSavingsView: View {
             }
         }
         .navigationTitle("Сбережения")
+        .scrollDismissesKeyboard(.interactively) // закрывать клавиатуру при скролле
+        // Закрыть клавиатуру тапом по пустому месту сверху/сбоку
+        .background(Color.clear.contentShape(Rectangle()).onTapGesture { hideKeyboard() })
+    }
+
+    private func hideKeyboard() {
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil)
+        #endif
     }
 }
 
-/// Компактное числовое поле, которое ОЧИЩАЕТСЯ при фокусе
-private struct DecimalField: View {
+// MARK: - Точное поле ввода на базе UIKit
+/// UITextField со следующими правилами:
+/// • курсор при фокусе ставится в конец;
+/// • над клавиатурой – кнопка «Готово» для закрытия;
+/// • во время ввода никаких «авто‑очисток»; форматирование – после завершения редактирования;
+/// • принимает и запятую, и точку; разделители тысяч — пробелы.
+private struct DecimalFieldUIKit: UIViewRepresentable {
     @Binding var value: Double
     let fractionDigits: Int
-    let width: CGFloat
 
-    @State private var text: String = ""
-    @FocusState private var focused: Bool
+    func makeUIView(context: Context) -> UITextField {
+        let tf = UITextField()
+        tf.keyboardType = .decimalPad
+        tf.textAlignment = .right
+        tf.adjustsFontSizeToFitWidth = true
+        tf.minimumFontSize = 12
+        tf.delegate = context.coordinator
+        tf.text = context.coordinator.format(value)
 
-    var body: some View {
-        TextField("0", text: $text)
-            .keyboardType(.decimalPad)
-            .multilineTextAlignment(.trailing)
-            .frame(width: width)
-            .focused($focused)
-            .onAppear { text = format(value) }
-            // очищаем при фокусе, форматируем при потере фокуса
-            .onChange(of: focused) { isFocused in
-                if isFocused {
-                    text = ""                // сразу затираем
-                } else {
-                    // при выходе — фиксируем значение и форматируем
-                    if let v = parse(text) { value = v }
-                    text = format(value)
-                }
-            }
-            // во время ввода обновляем связанное значение
-            .onChange(of: text) { new in
-                if focused, let v = parse(new) { value = v }
-            }
+        // тулбар с кнопкой «Готово»
+        let tb = UIToolbar()
+        tb.sizeToFit()
+        let flex = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let done = UIBarButtonItem(title: "Готово", style: .done,
+                                   target: context.coordinator,
+                                   action: #selector(Coordinator.doneTapped))
+        tb.items = [flex, done]
+        tf.inputAccessoryView = tb
+
+        // обновлять биндинг при каждом изменении
+        tf.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
+
+        return tf
     }
 
-    private func format(_ v: Double) -> String {
-        let nf = NumberFormatter()
-        nf.numberStyle = .decimal
-        nf.groupingSeparator = " "
-        nf.decimalSeparator = ","
-        nf.minimumFractionDigits = 0
-        nf.maximumFractionDigits = fractionDigits
-        return nf.string(from: NSNumber(value: v)) ?? "0"
+    func updateUIView(_ tf: UITextField, context: Context) {
+        // если поле не в фокусе — синхронизируем отформатированное значение
+        if !tf.isFirstResponder {
+            let formatted = context.coordinator.format(value)
+            if tf.text != formatted {
+                tf.text = formatted
+            }
+        }
     }
 
-    private func parse(_ s: String) -> Double? {
-        guard !s.isEmpty else { return 0 }
-        let ds = s
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: ",", with: ".")
-        return Double(ds)
+    func makeCoordinator() -> Coordinator {
+        Coordinator(value: $value, fractionDigits: fractionDigits)
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var value: Binding<Double>
+        let fractionDigits: Int
+
+        init(value: Binding<Double>, fractionDigits: Int) {
+            self.value = value
+            self.fractionDigits = fractionDigits
+        }
+
+        // Курсор в конец при начале редактирования
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            DispatchQueue.main.async {
+                let end = textField.endOfDocument
+                textField.selectedTextRange = textField.textRange(from: end, to: end)
+            }
+        }
+
+        // Форматирование при завершении
+        func textFieldDidEndEditing(_ textField: UITextField) {
+            textField.text = format(value.wrappedValue)
+        }
+
+        // При каждом изменении текста — обновляем биндинг
+        @objc func editingChanged(_ textField: UITextField) {
+            let s = textField.text ?? ""
+            if let v = parse(s) {
+                value.wrappedValue = v
+            }
+        }
+
+        // Разрешаем любые символы — нормализуем в parsing
+        func textField(_ textField: UITextField,
+                       shouldChangeCharactersIn range: NSRange,
+                       replacementString string: String) -> Bool { true }
+
+        @objc func doneTapped() {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                            to: nil, from: nil, for: nil)
+        }
+
+        // MARK: формат/парс
+        private func nf() -> NumberFormatter {
+            let nf = NumberFormatter()
+            nf.numberStyle = .decimal
+            nf.groupingSeparator = " "
+            nf.decimalSeparator = ","
+            nf.minimumFractionDigits = 0
+            nf.maximumFractionDigits = fractionDigits
+            return nf
+        }
+
+        func format(_ v: Double) -> String {
+            let vv = v.isFinite ? v : 0
+            return nf().string(from: NSNumber(value: vv)) ?? "0"
+        }
+
+        func parse(_ s: String) -> Double? {
+            let cleaned = s
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: ",", with: ".")
+            // Пустая строка трактуем как 0
+            if cleaned.isEmpty { return 0 }
+            return Double(cleaned)
+        }
     }
 }
