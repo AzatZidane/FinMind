@@ -52,6 +52,15 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: Диагностика
+                Section("Диагностика") {
+                    NavigationLink {
+                        DiagnosticsView()
+                    } label: {
+                        Label("Логи и отчёты", systemImage: "wrench.adjustable")
+                    }
+                }
+
                 // MARK: О приложении
                 Section("О приложении") {
                     NavigationLink {
@@ -96,12 +105,4 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView().environmentObject(AppState())
-}
-// MARK: Диагностика
-Section("Диагностика") {
-    NavigationLink {
-        DiagnosticsView()
-    } label: {
-        Label("Логи и отчёты", systemImage: "wrench.adjustable")
-    }
 }
