@@ -3,7 +3,7 @@ import SwiftUI
 struct EditSavingsView: View {
     @ObservedObject var store: SavingsStore = .shared
 
-    // какие валюты показывать в UI (можно расширить при желании)
+    // какие валюты показывать в UI
     private var fiatList: [Currency] {
         let wanted = Set(["RUB","USD","EUR","CNY","TRY"])
         return Currency.supported.filter { wanted.contains($0.code.uppercased()) }
@@ -67,26 +67,36 @@ struct EditSavingsView: View {
     }
 }
 
-/// Компактное числовое поле (без валютных символов); локальный helper.
+/// Компактное числовое поле, которое ОЧИЩАЕТСЯ при фокусе
 private struct DecimalField: View {
     @Binding var value: Double
     let fractionDigits: Int
     let width: CGFloat
 
     @State private var text: String = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
-        TextField("0", text: Binding(
-            get: { text.isEmpty ? format(value) : text },
-            set: { new in
-                text = new
-                if let v = parse(new) { value = v }
+        TextField("0", text: $text)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .frame(width: width)
+            .focused($focused)
+            .onAppear { text = format(value) }
+            // очищаем при фокусе, форматируем при потере фокуса
+            .onChange(of: focused) { isFocused in
+                if isFocused {
+                    text = ""                // сразу затираем
+                } else {
+                    // при выходе — фиксируем значение и форматируем
+                    if let v = parse(text) { value = v }
+                    text = format(value)
+                }
             }
-        ))
-        .keyboardType(.decimalPad)
-        .multilineTextAlignment(.trailing)
-        .frame(width: width)
-        .onAppear { text = format(value) }
+            // во время ввода обновляем связанное значение
+            .onChange(of: text) { new in
+                if focused, let v = parse(new) { value = v }
+            }
     }
 
     private func format(_ v: Double) -> String {
@@ -98,9 +108,12 @@ private struct DecimalField: View {
         nf.maximumFractionDigits = fractionDigits
         return nf.string(from: NSNumber(value: v)) ?? "0"
     }
+
     private func parse(_ s: String) -> Double? {
-        let ds = s.replacingOccurrences(of: " ", with: "")
-                   .replacingOccurrences(of: ",", with: ".")
+        guard !s.isEmpty else { return 0 }
+        let ds = s
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ",", with: ".")
         return Double(ds)
     }
 }
