@@ -345,6 +345,15 @@ struct BudgetView: View {
             guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
             total += qty * usd * r.usdToRub
         }
+        return total.isFinite ? total : 0
+    }
+
+
+        // CRYPTO
+        for (asset, qty) in SavingsStore.shared.cryptoHoldings {
+            guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
+            total += qty * usd * r.usdToRub
+        }
 
         // METALS (граммы -> унции)
         let gPerOz = 31.1034768
