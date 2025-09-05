@@ -44,7 +44,7 @@ final class RatesService {
         let fiat = try await fetchFiatUSD(codes: fiatCodes)
         guard let usdRub = fiat["RUB"], usdRub > 0 else { throw RatesError.missingRUB }
 
-        // Крипта/металлы — «мягкие» источники: если не удалось, вернём пустые словари
+        // Крипта/металлы — «мягкие»: если не удалось, вернём пустые словари
         let crypto = (try? await fetchCryptoUsd()) ?? [:]
         let metals = (try? await fetchMetalsUsd()) ?? [:]
 
@@ -125,26 +125,49 @@ final class RatesService {
         return result
     }
 
-    // MARK: - METALS (metals.live, несколько форматов + фоллбэки)
+    // MARK: - METALS
 
+    /// Основной источник — exchangerate.host: base = XAU/XAG/XPT/XPD, symbols = USD.
+    /// Возвращает USD за 1 тр. унцию. Параллельные запросы + фоллбэки на metals.live.
     private func fetchMetalsUsd() async throws -> [MetalAsset: Double] {
-        // 1) Попробуем «общий» эндпоинт /v1/spot (форматы у них разнятся)
-        if let dict = try? await parseMetalsFromSpotAll() {
-            if !dict.isEmpty { return dict }
-        }
-        // 2) Фоллбэк: по одному металлу (/spot/gold, /spot/silver, ...)
+        // 1) exchangerate.host — параллельно 4 металла
+        async let xau = fetchMetalUSD_fromERHost(base: "XAU")
+        async let xag = fetchMetalUSD_fromERHost(base: "XAG")
+        async let xpt = fetchMetalUSD_fromERHost(base: "XPT")
+        async let xpd = fetchMetalUSD_fromERHost(base: "XPD")
+
         var out: [MetalAsset: Double] = [:]
-        if let g = try? await fetchSingleMetal(path: "gold")      { out[.xau] = g }
-        if let s = try? await fetchSingleMetal(path: "silver")     { out[.xag] = s }
-        if let p = try? await fetchSingleMetal(path: "platinum")   { out[.xpt] = p }
-        if let d = try? await fetchSingleMetal(path: "palladium")  { out[.xpd] = d }
-        return out
+        let (g,s,p,d) = try await (xau,xag,xpt,xpd)
+        if let v = g { out[.xau] = v }
+        if let v = s { out[.xag] = v }
+        if let v = p { out[.xpt] = v }
+        if let v = d { out[.xpd] = v }
+
+        if !out.isEmpty { return out }
+
+        // 2) Фоллбэк: metals.live
+        if let dict = try? await parseMetalsFromSpotAll(), !dict.isEmpty {
+            return dict
+        }
+        var fb: [MetalAsset: Double] = [:]
+        if let g2 = try? await fetchSingleMetal(path: "gold")      { fb[.xau] = g2 }
+        if let s2 = try? await fetchSingleMetal(path: "silver")     { fb[.xag] = s2 }
+        if let p2 = try? await fetchSingleMetal(path: "platinum")   { fb[.xpt] = p2 }
+        if let d2 = try? await fetchSingleMetal(path: "palladium")  { fb[.xpd] = d2 }
+        return fb
     }
 
-    /// Разные варианты ответа /v1/spot:
-    ///  a) [{"gold":1934.1},{"silver":24.1},{"platinum":915.2},{"palladium":1200.3}]
-    ///  b) [{"metal":"gold","price":1934.1,"currency":"USD"}, ...]
-    ///  c) [{"gold":"1934.1"}, ...] — строки
+    /// Запрос в exchangerate.host для одного металла (USD за 1 единицу металла).
+    private func fetchMetalUSD_fromERHost(base: String) async throws -> Double? {
+        let url = URL(string: "https://api.exchangerate.host/latest?base=\(base)&symbols=USD")!
+        let (data, resp) = try await session.data(from: url)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw RatesError.badResponse }
+        let dict = try parseRatesDict(data: data, key: "rates")
+        return dict["USD"]
+    }
+
+    // ---- metals.live helpers (как в предыдущей версии) ----
+
     private func parseMetalsFromSpotAll() async throws -> [MetalAsset: Double] {
         let url = URL(string: "https://api.metals.live/v1/spot")!
         var req = URLRequest(url: url)
@@ -164,14 +187,12 @@ final class RatesService {
 
         var out: [MetalAsset: Double] = [:]
 
-        // Вариант a/c: массив словарей с ключами gold/silver/...
         if let arr = obj as? [[String: Any]] {
             for dict in arr {
                 if let v = dict["gold"],      let d = toDouble(v) { out[.xau] = d }
                 if let v = dict["silver"],    let d = toDouble(v) { out[.xag] = d }
                 if let v = dict["platinum"],  let d = toDouble(v) { out[.xpt] = d }
                 if let v = dict["palladium"], let d = toDouble(v) { out[.xpd] = d }
-                // Вариант b: {"metal":"gold","price":1934.1}
                 if let metal = dict["metal"] as? String, let price = dict["price"], let d = toDouble(price) {
                     switch metal.lowercased() {
                     case "gold":      out[.xau] = d
@@ -186,9 +207,6 @@ final class RatesService {
         return out
     }
 
-    /// Фоллбэк: /v1/spot/{metal} — форма бывает:
-    ///  • [1934.1, 1934.2, ...] — массив чисел; берём первый
-    ///  • [{"price":1934.1}, ...] — массив словарей; ищем первое число в значениях
     private func fetchSingleMetal(path: String) async throws -> Double {
         let url = URL(string: "https://api.metals.live/v1/spot/\(path)")!
         var req = URLRequest(url: url)
@@ -204,15 +222,11 @@ final class RatesService {
             if let i = any as? Int    { return Double(i) }
             if let s = any as? String { return Double(s.replacingOccurrences(of: ",", with: ".")) }
             if let dict = any as? [String: Any] {
-                for v in dict.values {
-                    if let n = extractFirstNumber(from: v) { return n }
-                }
+                for v in dict.values { if let n = extractFirstNumber(from: v) { return n } }
                 return nil
             }
             if let arr = any as? [Any] {
-                for el in arr {
-                    if let n = extractFirstNumber(from: el) { return n }
-                }
+                for el in arr { if let n = extractFirstNumber(from: el) { return n } }
                 return nil
             }
             return nil
@@ -221,9 +235,7 @@ final class RatesService {
         if let arr = obj as? [Any], let first = arr.first, let n = extractFirstNumber(from: first) {
             return n
         }
-        // если пришёл не массив — попробуем достать число из корня
         if let n = extractFirstNumber(from: obj) { return n }
-
         throw RatesError.decoding
     }
 
