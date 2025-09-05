@@ -369,6 +369,7 @@ struct BudgetView: View {
         if isLoadingRates { return }
         isLoadingRates = true
         ratesError = nil
+
         do {
             let codes = SavingsStore.shared.fiatCodesToFetch()
             let snap = try await RatesService.shared.fetchAll(fiatCodes: codes)
@@ -377,12 +378,22 @@ struct BudgetView: View {
                 self.isLoadingRates = false
             }
         } catch {
+            let ns = error as NSError
+            let message: String
+            if let e = error as? RatesError {
+                message = e.localizedDescription
+            } else if ns.domain == NSURLErrorDomain {
+                message = "Нет соединения с интернетом"
+            } else {
+                message = "Неизвестная ошибка"
+            }
             await MainActor.run {
-                self.ratesError = error.localizedDescription
+                self.ratesError = message
                 self.isLoadingRates = false
             }
         }
     }
+
 }
 
 #Preview {
