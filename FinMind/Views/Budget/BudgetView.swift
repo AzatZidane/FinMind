@@ -2,21 +2,26 @@ import SwiftUI
 
 struct BudgetView: View {
     @EnvironmentObject var app: AppState
+
+    // Курсы
     @State private var rates: RatesSnapshot?
     @State private var isLoadingRates = false
     @State private var ratesError: String?
 
-    // Редактирование
-    @State private var editingIncome: Income?
-    @State private var editingExpense: Expense?
-
+    // Листы «Добавить»
     private enum SheetType: Identifiable { case income, expense, debt, goal; var id: Int { hashValue } }
     @State private var activeSheet: SheetType?
 
+    // Листы «Редактировать»
+    @State private var editingIncome: Income?
+    @State private var editingExpense: Expense?
+
+    // Текущий месяц (первый день)
     private var month: Date {
         let cal = Calendar.current
         return cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
     }
+
     private var totalIncomeBase: Double { monthlyIncomeBase(for: month) }
     private var totalExpenseBase: Double { monthlyExpenseBase(for: month) }
     private var netBase: Double { totalIncomeBase - totalExpenseBase }
@@ -37,7 +42,7 @@ struct BudgetView: View {
                         Section { Text("Пока нет данных").foregroundStyle(.secondary) }
                     }
                 }
-                .transaction { $0.animation = nil } // меньше анимаций = быстрее
+                .transaction { $0.animation = nil } // немного быстрее прокрутка
             }
             .padding(.top, 8)
             .navigationTitle("Бюджет")
@@ -52,7 +57,12 @@ struct BudgetView: View {
                     } label: { Label("Добавить", systemImage: "plus") }
                 }
             }
-            .onAppear { if rates == nil { Task { await loadRates() } } }
+            .onAppear {
+                if rates == nil {
+                    Task { await loadRates() }
+                }
+            }
+            // Добавление
             .sheet(item: $activeSheet) { sheet in
                 switch sheet {
                 case .income:  AddIncomeView().environmentObject(app)
@@ -71,7 +81,7 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Сбережения
+    // MARK: - Секция «Сбережения»
     private var savingsSection: some View {
         Section("Сбережения") {
             HStack {
@@ -92,11 +102,12 @@ struct BudgetView: View {
             }
 
             if let e = ratesError {
-                Text("Не удалось обновить курсы. ") +
-                Text(e).foregroundStyle(.secondary)
+                Text(e).foregroundStyle(.red).font(.footnote)
             }
 
-            NavigationLink { EditSavingsView() } label: {
+            NavigationLink {
+                EditSavingsView()
+            } label: {
                 Label("Редактировать сбережения", systemImage: "pencil")
             }
 
@@ -113,24 +124,38 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Итоги
+    // MARK: - Итоговая карточка
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack { Text("Доходы (мес.)"); Spacer()
+            HStack {
+                Text("Доходы (мес.)")
+                Spacer()
                 Text(app.formatMoney(totalIncomeBase, currency: app.baseCurrency))
-                    .font(.headline.monospacedDigit()) }
-            HStack { Text("Расходы (мес.)"); Spacer()
+                    .font(.headline.monospacedDigit())
+            }
+            HStack {
+                Text("Расходы (мес.)")
+                Spacer()
                 Text(app.formatMoney(totalExpenseBase, currency: app.baseCurrency))
-                    .font(.headline.monospacedDigit()) }
+                    .font(.headline.monospacedDigit())
+            }
             Divider()
-            HStack { Text("Итог"); Spacer()
+            HStack {
+                Text("Итог")
+                Spacer()
                 Text(app.formatMoney(netBase, currency: app.baseCurrency))
                     .font(.headline.monospacedDigit())
-                    .foregroundStyle(netBase >= 0 ? .green : .red) }
+                    .foregroundStyle(netBase >= 0 ? .green : .red)
+            }
             if let rub = rates?.usdToRub {
                 Divider()
-                HStack { Text("Курс USD/RUB"); Spacer()
-                    Text(formattedRUB(rub)).font(.subheadline).foregroundStyle(.secondary) }
+                HStack {
+                    Text("Курс USD/RUB")
+                    Spacer()
+                    Text(formattedRUB(rub))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(12)
@@ -138,7 +163,8 @@ struct BudgetView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Разделы
+    // MARK: - Разделы доходы/расходы/долги/цели
+
     private var incomesSection: some View {
         Group {
             if !app.incomes.isEmpty {
@@ -240,24 +266,30 @@ struct BudgetView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(inc.name)
-                Text(kindText(inc.kind)).font(.caption).foregroundStyle(.secondary)
+                Text(kindText(inc.kind))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Text(app.formatMoney(inc.amount, currency: inc.currency))
                 .font(.headline.monospacedDigit())
         }
     }
+
     @ViewBuilder private func expenseRow(_ exp: Expense) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(exp.name)
-                Text(kindText(exp.kind)).font(.caption).foregroundStyle(.secondary)
+                Text(kindText(exp.kind))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Text(app.formatMoney(exp.amount, currency: exp.currency))
                 .font(.headline.monospacedDigit())
         }
     }
+
     @ViewBuilder private func debtRow(_ d: Debt) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -269,13 +301,16 @@ struct BudgetView: View {
                 .font(.headline.monospacedDigit())
         }
     }
+
     @ViewBuilder private func goalRow(_ g: Goal) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(g.name)
                 Text(g.deadline.map {
                     $0.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
-                } ?? "Без срока").font(.caption).foregroundStyle(.tertiary)
+                } ?? "Без срока")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
             }
             Spacer()
             Text(app.formatMoney(g.targetAmount, currency: g.currency))
@@ -283,7 +318,7 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Helpers (месяц)
+    // MARK: - Helpers: подписи типов
     private func kindText(_ k: IncomeKind) -> String {
         switch k {
         case .recurring(let r): return r.localized
@@ -299,6 +334,7 @@ struct BudgetView: View {
         }
     }
 
+    // MARK: - Helpers: месячные суммы в базовой валюте
     private func monthlyIncomeBase(for month: Date) -> Double {
         let rec = app.totalNormalizedMonthlyRecurringIncome(for: month)
         let cal = Calendar.current
@@ -309,6 +345,7 @@ struct BudgetView: View {
         }
         return rec + NSDecimalNumber(decimal: oneOff).doubleValue
     }
+
     private func monthlyExpenseBase(for month: Date) -> Double {
         var total = app.plannedMonthlyExpense(for: month)
         let cal = Calendar.current
@@ -321,12 +358,12 @@ struct BudgetView: View {
         return total
     }
 
-    // MARK: - Сбережения: расчёт
+    // MARK: - Сбережения: сумма в RUB (фиат + крипто)
     private func totalSavingsRub() -> Double {
         guard let r = rates else { return 0 }
         var total: Double = 0
 
-        // FIAT: сумма в валюте -> RUB
+        // ФИАТ: сумма в валюте -> RUB
         for (code, amount) in SavingsStore.shared.fiat {
             guard amount > 0 else { continue }
             let c = code.uppercased()
@@ -340,26 +377,10 @@ struct BudgetView: View {
             }
         }
 
-        // CRYPTO
+        // КРИПТО: qty * USD * (USD->RUB)
         for (asset, qty) in SavingsStore.shared.cryptoHoldings {
             guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
             total += qty * usd * r.usdToRub
-        }
-        return total.isFinite ? total : 0
-    }
-
-
-        // CRYPTO
-        for (asset, qty) in SavingsStore.shared.cryptoHoldings {
-            guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
-            total += qty * usd * r.usdToRub
-        }
-
-        // METALS (граммы -> унции)
-        let gPerOz = 31.1034768
-        for (m, grams) in SavingsStore.shared.metalGrams {
-            guard grams > 0, let usdPerOz = r.metalsUsd[m] else { continue }
-            total += (grams / gPerOz) * usdPerOz * r.usdToRub
         }
         return total.isFinite ? total : 0
     }
@@ -378,7 +399,6 @@ struct BudgetView: View {
         if isLoadingRates { return }
         isLoadingRates = true
         ratesError = nil
-
         do {
             let codes = SavingsStore.shared.fiatCodesToFetch()
             let snap = try await RatesService.shared.fetchAll(fiatCodes: codes)
@@ -402,7 +422,6 @@ struct BudgetView: View {
             }
         }
     }
-
 }
 
 #Preview {
