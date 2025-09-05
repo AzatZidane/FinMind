@@ -97,3 +97,11 @@ struct SettingsView: View {
 #Preview {
     SettingsView().environmentObject(AppState())
 }
+// MARK: Диагностика
+Section("Диагностика") {
+    NavigationLink {
+        DiagnosticsView()
+    } label: {
+        Label("Логи и отчёты", systemImage: "wrench.adjustable")
+    }
+}
