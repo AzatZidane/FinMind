@@ -44,7 +44,7 @@ struct BudgetView: View {
                         Section { Text("Пока нет данных").foregroundStyle(.secondary) }
                     }
                 }
-                .transaction { $0.animation = nil } // немного быстрее прокрутка
+                .transaction { $0.animation = nil }
             }
             .padding(.top, 8)
             .navigationTitle("Бюджет")
@@ -60,69 +60,56 @@ struct BudgetView: View {
                 }
             }
             .onAppear {
-                if rates == nil {
-                    Task { await loadRates() }
-                }
+                if rates == nil { Task { await loadRates() } }
             }
-            // Добавление (оборачиваем в NavigationStack, чтобы были заголовок и toolbar)
+            // Добавление
             .sheet(item: $activeSheet) { sheet in
                 switch sheet {
-                case .income:
-                    NavigationStack { AddIncomeView().environmentObject(app) }
-                case .expense:
-                    NavigationStack { AddExpenseView().environmentObject(app) }
-                case .debt:
-                    NavigationStack { AddDebtView().environmentObject(app) }
-                case .goal:
-                    NavigationStack { AddGoalView().environmentObject(app) }
+                case .income:  NavigationStack { AddIncomeView().environmentObject(app) }
+                case .expense: NavigationStack { AddExpenseView().environmentObject(app) }
+                case .debt:    NavigationStack { AddDebtView().environmentObject(app) }
+                case .goal:    NavigationStack { AddGoalView().environmentObject(app) }
                 }
             }
-            // Редактирование — те же экраны с параметром existing:
-            .sheet(item: $editingIncome)  { inc in
-                NavigationStack { AddIncomeView(existing: inc).environmentObject(app) }
-            }
-            .sheet(item: $editingExpense) { exp in
-                NavigationStack { AddExpenseView(existing: exp).environmentObject(app) }
-            }
-            .sheet(item: $editingDebt)    { d in
-                NavigationStack { AddDebtView(existing: d).environmentObject(app) }
-            }
-            .sheet(item: $editingGoal)    { g in
-                NavigationStack { AddGoalView(existing: g).environmentObject(app) }
-            }
+            // Редактирование
+            .sheet(item: $editingIncome)  { inc in NavigationStack { AddIncomeView(existing: inc).environmentObject(app) } }
+            .sheet(item: $editingExpense) { exp in NavigationStack { AddExpenseView(existing: exp).environmentObject(app) } }
+            .sheet(item: $editingDebt)    { d   in NavigationStack { AddDebtView(existing: d).environmentObject(app) } }
+            .sheet(item: $editingGoal)    { g   in NavigationStack { AddGoalView(existing: g).environmentObject(app) } }
         }
     }
 
     // MARK: - Секция «Сбережения»
     private var savingsSection: some View {
         Section("Сбережения") {
-            HStack {
-                Text("Всего (в RUB)")
-                Spacer()
+            // 1) «Всего (в RUB)» — гарантированно рисуется как строка списка
+            LabeledContent("Всего (в RUB)") {
                 Text(formattedRUB(totalSavingsRub()))
                     .font(.headline.monospacedDigit())
             }
 
+            // 2) «Курсы обновлены …»
             if let r = rates {
-                HStack {
-                    Text("Курсы обновлены")
-                    Spacer()
+                LabeledContent("Курсы обновлены") {
                     Text(r.updatedAt.formatted(date: .abbreviated, time: .shortened))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
             }
 
+            // 3) Возможная ошибка загрузки курсов
             if let e = ratesError {
                 Text(e).foregroundStyle(.red).font(.footnote)
             }
 
+            // 4) Переход на экран редактирования сбережений
             NavigationLink {
                 EditSavingsView()
             } label: {
                 Label("Редактировать сбережения", systemImage: "pencil")
             }
 
+            // 5) Обновить курсы
             Button {
                 Task { await loadRates(force: true) }
             } label: {
@@ -184,21 +171,12 @@ struct BudgetView: View {
                     ForEach(app.incomes) { inc in
                         incomeRow(inc)
                             .contextMenu {
-                                Button { editingIncome = inc } label: {
-                                    Label("Редактировать", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) { app.removeIncome(inc) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingIncome = inc } label: { Label("Редактировать", systemImage: "pencil") }
+                                Button(role: .destructive) { app.removeIncome(inc) } label: { Label("Удалить", systemImage: "trash") }
                             }
                             .swipeActions {
-                                Button { editingIncome = inc } label: {
-                                    Label("Редакт.", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                                Button(role: .destructive) { app.removeIncome(inc) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingIncome = inc } label: { Label("Редакт.", systemImage: "pencil") }.tint(.blue)
+                                Button(role: .destructive) { app.removeIncome(inc) } label: { Label("Удалить", systemImage: "trash") }
                             }
                     }
                     .onDelete { app.incomes.remove(atOffsets: $0) }
@@ -214,21 +192,12 @@ struct BudgetView: View {
                     ForEach(app.expenses) { exp in
                         expenseRow(exp)
                             .contextMenu {
-                                Button { editingExpense = exp } label: {
-                                    Label("Редактировать", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) { app.removeExpense(exp) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingExpense = exp } label: { Label("Редактировать", systemImage: "pencil") }
+                                Button(role: .destructive) { app.removeExpense(exp) } label: { Label("Удалить", systemImage: "trash") }
                             }
                             .swipeActions {
-                                Button { editingExpense = exp } label: {
-                                    Label("Редакт.", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                                Button(role: .destructive) { app.removeExpense(exp) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingExpense = exp } label: { Label("Редакт.", systemImage: "pencil") }.tint(.blue)
+                                Button(role: .destructive) { app.removeExpense(exp) } label: { Label("Удалить", systemImage: "trash") }
                             }
                     }
                     .onDelete { app.expenses.remove(atOffsets: $0) }
@@ -244,21 +213,12 @@ struct BudgetView: View {
                     ForEach(app.debts) { d in
                         debtRow(d)
                             .contextMenu {
-                                Button { editingDebt = d } label: {
-                                    Label("Редактировать", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) { app.removeDebt(d) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingDebt = d } label: { Label("Редактировать", systemImage: "pencil") }
+                                Button(role: .destructive) { app.removeDebt(d) } label: { Label("Удалить", systemImage: "trash") }
                             }
                             .swipeActions {
-                                Button { editingDebt = d } label: {
-                                    Label("Редакт.", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                                Button(role: .destructive) { app.removeDebt(d) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingDebt = d } label: { Label("Редакт.", systemImage: "pencil") }.tint(.blue)
+                                Button(role: .destructive) { app.removeDebt(d) } label: { Label("Удалить", systemImage: "trash") }
                             }
                     }
                     .onDelete { app.debts.remove(atOffsets: $0) }
@@ -274,21 +234,12 @@ struct BudgetView: View {
                     ForEach(app.goals) { g in
                         goalRow(g)
                             .contextMenu {
-                                Button { editingGoal = g } label: {
-                                    Label("Редактировать", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) { app.removeGoal(g) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingGoal = g } label: { Label("Редактировать", systemImage: "pencil") }
+                                Button(role: .destructive) { app.removeGoal(g) } label: { Label("Удалить", systemImage: "trash") }
                             }
                             .swipeActions {
-                                Button { editingGoal = g } label: {
-                                    Label("Редакт.", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                                Button(role: .destructive) { app.removeGoal(g) } label: {
-                                    Label("Удалить", systemImage: "trash")
-                                }
+                                Button { editingGoal = g } label: { Label("Редакт.", systemImage: "pencil") }.tint(.blue)
+                                Button(role: .destructive) { app.removeGoal(g) } label: { Label("Удалить", systemImage: "trash") }
                             }
                     }
                     .onDelete { app.goals.remove(atOffsets: $0) }
@@ -302,9 +253,7 @@ struct BudgetView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(inc.name)
-                Text(kindText(inc.kind))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(kindText(inc.kind)).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Text(app.formatMoney(inc.amount, currency: inc.currency))
@@ -316,9 +265,7 @@ struct BudgetView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(exp.name)
-                Text(kindText(exp.kind))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(kindText(exp.kind)).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Text(app.formatMoney(exp.amount, currency: exp.currency))
@@ -344,9 +291,7 @@ struct BudgetView: View {
                 Text(g.name)
                 Text(g.deadline.map {
                     $0.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
-                } ?? "Без срока")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                } ?? "Без срока").font(.caption).foregroundStyle(.tertiary)
             }
             Spacer()
             Text(app.formatMoney(g.targetAmount, currency: g.currency))
@@ -399,7 +344,7 @@ struct BudgetView: View {
         guard let r = rates else { return 0 }
         var total: Double = 0
 
-        // ФИАТ: сумма в валюте -> RUB
+        // ФИАТ
         for (code, amount) in SavingsStore.shared.fiat {
             guard amount > 0 else { continue }
             let c = code.uppercased()
@@ -408,12 +353,11 @@ struct BudgetView: View {
             } else if c == "USD" {
                 total += amount * r.usdToRub
             } else if let usdToCurr = r.fiatUSD[c], usdToCurr > 0 {
-                // 1 USD = usdToCurr currency -> 1 currency = 1/usdToCurr USD
-                total += amount * (r.usdToRub / usdToCurr)
+                total += amount * (r.usdToRub / usdToCurr) // 1 curr = (USD/RATE)
             }
         }
 
-        // КРИПТО: qty * USD * (USD->RUB)
+        // КРИПТО
         for (asset, qty) in SavingsStore.shared.cryptoHoldings {
             guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
             total += qty * usd * r.usdToRub
