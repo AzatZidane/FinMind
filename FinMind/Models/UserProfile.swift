@@ -1,15 +1,9 @@
 import Foundation
 
 struct UserProfile: Codable, Identifiable, Equatable {
-    let id: String          // UUID, сгенерированный на устройстве
+    let id: String          // UUID пользователя
     var email: String
     var nickname: String
     var createdAt: Date
-}
-struct UserProfile: Codable, Identifiable, Equatable {
-    let id: String
-    var email: String
-    var nickname: String
-    var createdAt: Date
-    var lastUpdated: Date?   // может быть nil
+    var lastUpdated: Date?  // nil (NaN) при регистрации
 }
