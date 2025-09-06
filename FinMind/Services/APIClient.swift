@@ -13,12 +13,13 @@ enum APIError: LocalizedError {
 }
 
 enum API {
-    // В разработке:
-    //  - Симулятор на этом же Mac: http://127.0.0.1:8000
-    //  - Реальное устройство: замените на http://<IP_вашего_ПК>:8000
-    //  - Или используйте HTTPS (ngrok/Cloudflare tunnel) — рекомендовано
+#if targetEnvironment(simulator)
     static var baseURL: String = "http://127.0.0.1:8000"
+#else
+    static var baseURL: String = "http://192.168.0.105:8000" // IP твоего ПК в Wi-Fi сети
+#endif
 }
+
 
 final class APIClient {
     static let shared = APIClient()
