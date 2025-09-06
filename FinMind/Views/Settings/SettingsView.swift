@@ -2,24 +2,17 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
+    @ObservedObject private var profileStore = ProfileStore.shared   // <-- наблюдаем профиль
+
     @State private var showWipeAlert = false
 
     var body: some View {
         NavigationStack {
             List {
-                // MARK: Отображение
-                Section("Отображение") {
-                    Toggle("Показывать копейки", isOn: $app.useCents)
 
-                    Picker("Тема", selection: $app.appearance) {
-                        ForEach(AppAppearance.allCases, id: \.self) { ap in
-                            Text(ap.title).tag(ap as AppAppearance)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
+                // MARK: Профиль
                 Section("Профиль") {
-                    if let p = ProfileStore.shared.profile {
+                    if let p = profileStore.profile {
                         LabeledContent("Имя", value: p.nickname)
                         LabeledContent("Почта", value: p.email)
                         if let dt = p.lastUpdated {
@@ -34,6 +27,18 @@ struct SettingsView: View {
                         NavigationLink("Зарегистрироваться") { RegistrationView() }
                     }
                 }
+
+                // MARK: Отображение
+                Section("Отображение") {
+                    Toggle("Показывать копейки", isOn: $app.useCents)
+                    Picker("Тема", selection: $app.appearance) {
+                        ForEach(AppAppearance.allCases, id: \.self) { ap in
+                            Text(ap.title).tag(ap as AppAppearance)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 // MARK: Валюта
                 Section("Валюта") {
                     Picker("Базовая валюта", selection: $app.baseCurrency) {
@@ -53,7 +58,6 @@ struct SettingsView: View {
                             .monospacedDigit()
                     }
                     Button("Обновить курсы") {
-                        // Демоверсия: просто отметим время
                         app.rates.updatedAt = Date()
                     }
                 }
@@ -78,9 +82,7 @@ struct SettingsView: View {
 
                 // MARK: О приложении
                 Section("О приложении") {
-                    NavigationLink {
-                        PrivacyPolicyView()
-                    } label: {
+                    NavigationLink { PrivacyPolicyView() } label: {
                         Label("Политика конфиденциальности", systemImage: "doc.text.magnifyingglass")
                     }
 
@@ -91,9 +93,7 @@ struct SettingsView: View {
                     }
                     .alert("Удалить все данные?", isPresented: $showWipeAlert) {
                         Button("Отмена", role: .cancel) {}
-                        Button("Удалить", role: .destructive) {
-                            wipeAllData()
-                        }
+                        Button("Удалить", role: .destructive) { wipeAllData() }
                     } message: {
                         Text("Будут удалены все доходы, расходы, долги, цели, ежедневные записи, сбережения, история чатов и локальные настройки.")
                     }
@@ -103,7 +103,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Локальная очистка всех данных
+    // MARK: - Полная локальная очистка
     private func wipeAllData() {
         app.incomes.removeAll()
         app.expenses.removeAll()
@@ -112,7 +112,6 @@ struct SettingsView: View {
         app.dailyEntries.removeAll()
         app.reserves.removeAll()
         app.rates.updatedAt = nil
-        // если используется история чатов
         ChatStorage.shared.clear()
         app.forceSave()
     }
