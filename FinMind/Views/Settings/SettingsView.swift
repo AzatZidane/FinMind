@@ -2,8 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-    @ObservedObject private var profileStore = ProfileStore.shared   // <-- наблюдаем профиль
-
+    @ObservedObject private var profileStore = ProfileStore.shared
     @State private var showWipeAlert = false
 
     var body: some View {
@@ -48,20 +47,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: Курсы (демо)
-                Section("Курсы (демо)") {
-                    HStack {
-                        Text("Обновлено")
-                        Spacer()
-                        Text(app.rates.updatedAt?.formatted(date: .abbreviated, time: .shortened) ?? "—")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    Button("Обновить курсы") {
-                        app.rates.updatedAt = Date()
-                    }
-                }
-
                 // MARK: Резервная копия
                 Section("Резервная копия") {
                     NavigationLink {
@@ -71,12 +56,12 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: Диагностика
-                Section("Диагностика") {
+                // MARK: Обратная связь
+                Section("Обратная связь") {
                     NavigationLink {
-                        DiagnosticsView()
+                        FeedbackView()
                     } label: {
-                        Label("Логи и отчёты", systemImage: "wrench.adjustable")
+                        Label("Сообщить об ошибке", systemImage: "ladybug")
                     }
                 }
 
@@ -103,7 +88,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Полная локальная очистка
+    // Полная локальная очистка
     private func wipeAllData() {
         app.incomes.removeAll()
         app.expenses.removeAll()
