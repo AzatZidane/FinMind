@@ -15,8 +15,8 @@ struct BudgetView: View {
     // Листы «Редактировать»
     @State private var editingIncome: Income?
     @State private var editingExpense: Expense?
-    @State private var editingDebt: Debt?          // ← добавлено (редактирование долга)
-    @State private var editingGoal: Goal?          // ← добавлено (редактирование цели)
+    @State private var editingDebt: Debt?
+    @State private var editingGoal: Goal?
 
     // Текущий месяц (первый день)
     private var month: Date {
@@ -64,20 +64,32 @@ struct BudgetView: View {
                     Task { await loadRates() }
                 }
             }
-            // Добавление
+            // Добавление (оборачиваем в NavigationStack, чтобы были заголовок и toolbar)
             .sheet(item: $activeSheet) { sheet in
                 switch sheet {
-                case .income:  AddIncomeView().environmentObject(app)
-                case .expense: AddExpenseView().environmentObject(app)
-                case .debt:    AddDebtView().environmentObject(app)
-                case .goal:    AddGoalView().environmentObject(app)
+                case .income:
+                    NavigationStack { AddIncomeView().environmentObject(app) }
+                case .expense:
+                    NavigationStack { AddExpenseView().environmentObject(app) }
+                case .debt:
+                    NavigationStack { AddDebtView().environmentObject(app) }
+                case .goal:
+                    NavigationStack { AddGoalView().environmentObject(app) }
                 }
             }
-            // Редактирование — используем те же экраны с параметром `existing:`
-            .sheet(item: $editingIncome)  { inc in AddIncomeView(existing: inc).environmentObject(app) }
-            .sheet(item: $editingExpense) { exp in AddExpenseView(existing: exp).environmentObject(app) }
-            .sheet(item: $editingDebt)    { d   in AddDebtView(existing: d).environmentObject(app) }     // ← новое
-            .sheet(item: $editingGoal)    { g   in AddGoalView(existing: g).environmentObject(app) }     // ← новое
+            // Редактирование — те же экраны с параметром existing:
+            .sheet(item: $editingIncome)  { inc in
+                NavigationStack { AddIncomeView(existing: inc).environmentObject(app) }
+            }
+            .sheet(item: $editingExpense) { exp in
+                NavigationStack { AddExpenseView(existing: exp).environmentObject(app) }
+            }
+            .sheet(item: $editingDebt)    { d in
+                NavigationStack { AddDebtView(existing: d).environmentObject(app) }
+            }
+            .sheet(item: $editingGoal)    { g in
+                NavigationStack { AddGoalView(existing: g).environmentObject(app) }
+            }
         }
     }
 
@@ -231,7 +243,7 @@ struct BudgetView: View {
                 Section("Долги") {
                     ForEach(app.debts) { d in
                         debtRow(d)
-                            .contextMenu {     // ← добавили меню редактирования
+                            .contextMenu {
                                 Button { editingDebt = d } label: {
                                     Label("Редактировать", systemImage: "pencil")
                                 }
@@ -239,7 +251,7 @@ struct BudgetView: View {
                                     Label("Удалить", systemImage: "trash")
                                 }
                             }
-                            .swipeActions {     // ← и свайп
+                            .swipeActions {
                                 Button { editingDebt = d } label: {
                                     Label("Редакт.", systemImage: "pencil")
                                 }
@@ -261,7 +273,7 @@ struct BudgetView: View {
                 Section("Цели") {
                     ForEach(app.goals) { g in
                         goalRow(g)
-                            .contextMenu {     // ← добавили меню редактирования
+                            .contextMenu {
                                 Button { editingGoal = g } label: {
                                     Label("Редактировать", systemImage: "pencil")
                                 }
@@ -269,7 +281,7 @@ struct BudgetView: View {
                                     Label("Удалить", systemImage: "trash")
                                 }
                             }
-                            .swipeActions {     // ← и свайп
+                            .swipeActions {
                                 Button { editingGoal = g } label: {
                                     Label("Редакт.", systemImage: "pencil")
                                 }
