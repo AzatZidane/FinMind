@@ -1,30 +1,31 @@
 import SwiftUI
 
-private enum AppTab: Hashable {
-    case budget, charts, advisor, settings
-}
-
 struct RootView: View {
-    @EnvironmentObject var app: AppState
-    @State private var selected: AppTab = .budget   // по умолчанию открываем «Бюджет»
+    @State private var showRegistration = false
 
     var body: some View {
-        TabView(selection: $selected) {
+        TabView {
             BudgetView()
                 .tabItem { Label("Бюджет", systemImage: "list.bullet.rectangle") }
-                .tag(AppTab.budget)
 
             ChartsView()
-                .tabItem { Label("Графики", systemImage: "chart.xyaxis.line") }
-                .tag(AppTab.charts)
+                .tabItem { Label("Графики", systemImage: "chart.line.uptrend.xyaxis") }
 
-            AdvisorChatView()
-                .tabItem { Label("Советник", systemImage: "sparkles") }
-                .tag(AppTab.advisor)
+            AdvisorView()
+                .tabItem { Label("Советник", systemImage: "brain.head.profile") }
 
             SettingsView()
-                .tabItem { Label("Настройки", systemImage: "gearshape") }
-                .tag(AppTab.settings)
+                .tabItem { Label("Настройки", systemImage: "gear") }
+        }
+        .onAppear {
+            if !ProfileStore.shared.isRegistered {
+                showRegistration = true
+            }
+        }
+        .fullScreenCover(isPresented: $showRegistration) {
+            RegistrationView()
         }
     }
 }
+
+#Preview { RootView() }
