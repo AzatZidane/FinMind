@@ -4,14 +4,9 @@ import SwiftUI
 struct FinMindApp: App {
     @StateObject private var appState: AppState
 
-    init() {
-        // Твой load() возвращает НЕ-опциональный AppState (и не бросает) — значит без "??"
+    init() {    
         let loaded = Persistence.shared.load()
-        _appState = StateObject(wrappedValue: loaded)
-
-        // Если когда-нибудь сделаешь load() бросающим:
-        // let loaded = (try? Persistence.shared.load()) ?? AppState()
-        // _appState = StateObject(wrappedValue: loaded)
+        _appState = StateObject(wrappedValue: loaded)        
     }
 
     var body: some Scene {
