@@ -227,6 +227,19 @@ struct BudgetView: View {
         }
     }
 
+    private var debtPaymentsThisMonth: Double {
+        app.debts.reduce(0) { $0 + $1.obligatoryMonthlyPayment }
+    }
+
+    // В summaryCard после строки "Расходы (мес.)"
+    HStack {
+        Text("в т.ч. платежи по долгам")
+        Spacer()
+        Text(app.formatMoney(debtPaymentsThisMonth, currency: app.baseCurrency))
+            .font(.subheadline.monospacedDigit())
+            .foregroundStyle(.secondary)
+    }
+
     private var goalsSection: some View {
         Group {
             if !app.goals.isEmpty {
@@ -327,17 +340,40 @@ struct BudgetView: View {
         return rec + NSDecimalNumber(decimal: oneOff).doubleValue
     }
 
+    // Заменить существующую monthlyExpenseBase(for:)
     private func monthlyExpenseBase(for month: Date) -> Double {
-        var total = app.plannedMonthlyExpense(for: month)
-        let cal = Calendar.current
-        let oneOff: Decimal = app.expenses.reduce(0) { acc, e in
-            guard case .oneOff(let d, _) = e.kind,
-                  let d, cal.isDate(d, equalTo: month, toGranularity: .month) else { return acc }
-            return acc + app.toBase(Decimal(e.amount), from: e.currency)
+        // Рекуррентные расходы -> к базовой валюте
+        let recurringExpensesBase: Double = app.expenses.reduce(0) { acc, e in
+            let perMonth = e.normalizedMonthlyAmount(for: month)            // Double
+            let converted = NSDecimalNumber(
+                decimal: app.toBase(Decimal(perMonth), from: e.currency)
+            ).doubleValue
+            return acc + converted
         }
-        total += NSDecimalNumber(decimal: oneOff).doubleValue
-        return total
+
+        // Платежи по долгам -> к базовой валюте
+        let debtPaymentsBase: Double = app.debts.reduce(0) { acc, d in
+            let converted = NSDecimalNumber(
+                decimal: app.toBase(Decimal(d.obligatoryMonthlyPayment), from: d.currency)
+            ).doubleValue
+            return acc + converted
+        }
+
+        // Разовые траты текущего месяца -> к базовой валюте
+        let cal = Calendar.current
+        let oneOffBase: Double = app.expenses.reduce(0) { acc, e in
+            guard case .oneOff(let date, _) = e.kind,
+                let date, cal.isDate(date, equalTo: month, toGranularity: .month)
+            else { return acc }
+            let converted = NSDecimalNumber(
+                decimal: app.toBase(Decimal(e.amount), from: e.currency)
+            ).doubleValue
+            return acc + converted
+        }
+
+        return recurringExpensesBase + debtPaymentsBase + oneOffBase
     }
+
 
     // MARK: - Сбережения: сумма в RUB (фиат + крипто)
     private func totalSavingsRub() -> Double {
