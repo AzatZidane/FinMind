@@ -4,141 +4,50 @@ struct AddDebtView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var app: AppState
 
-    enum Mode: String, CaseIterable, Identifiable {
-        case monthly = "Ежемесячный платёж"
-        case loan    = "Параметры кредита"
-        var id: String { rawValue }
-    }
+    var existing: Debt? = nil
 
-    @State private var mode: Mode = .monthly
-
-    // Monthly payment mode
-    @State private var monthlyName: String = ""
-    @State private var monthlyAmount: String = ""
-    @State private var isMinimum: Bool = true
-
-    // Loan mode
-    @State private var loanName: String = ""
-    @State private var principal: String = ""
-    @State private var apr: String = "" // %
-    @State private var termMonths: String = ""
-    @State private var graceMonths: String = ""
-    @State private var minPayment: String = ""
-
-    @State private var showError = false
-    @State private var errorText = ""
+    @State private var title: String = ""
+    @State private var monthlyInt: Int = 0
+    @State private var currency: Currency = .rub
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker("Режим", selection: $mode) {
-                        ForEach(Mode.allCases) { m in
-                            Text(m.rawValue).tag(m as Mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Тип долга")
-                }
-
-                if mode == .monthly {
-                    Section {
-                        TextField("Название", text: $monthlyName)
-                        TextField("Сумма", text: $monthlyAmount)
-                            .decimalKeyboardIfAvailable()
-                        Toggle("Минимальный платёж", isOn: $isMinimum)
-                    } header: {
-                        Text("Ежемесячный платёж")
-                    }
-                } else {
-                    Section {
-                        TextField("Название", text: $loanName)
-                        TextField("Сумма кредита", text: $principal)
-                            .decimalKeyboardIfAvailable()
-                        TextField("Ставка APR, %", text: $apr)
-                            .decimalKeyboardIfAvailable()
-                        TextField("Срок, месяцев", text: $termMonths)
-                            .numberKeyboardIfAvailable()
-                        TextField("Грейс-период, мес (опц.)", text: $graceMonths)
-                            .numberKeyboardIfAvailable()
-                        TextField("Мин. платёж (опц.)", text: $minPayment)
-                            .decimalKeyboardIfAvailable()
-                    } header: {
-                        Text("Параметры кредита")
+        Form {
+            Section("Ежемесячный платёж") {
+                TextField("Название", text: $title)
+                GroupedIntField(value: $monthlyInt, placeholder: "0")
+                Picker("Валюта", selection: $currency) {
+                    ForEach(Currency.supported) { c in
+                        Text("\(c.code) \(c.symbol)").tag(c)
                     }
                 }
-            }
-            .navigationTitle("Новый долг")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") { save() }
-                }
-            }
-            .alert("Ошибка", isPresented: $showError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorText)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .navigationTitle(existing == nil ? "Новый долг" : "Редактировать долг")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(existing == nil ? "Сохранить" : "Обновить") { save() }
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || monthlyInt <= 0)
+            }
+        }
+        .onAppear { preload() }
+    }
+
+    private func preload() {
+        guard let d = existing else { return }
+        title = d.title
+        monthlyInt = Int(d.obligatoryMonthlyPayment.rounded())
+        currency = d.currency
     }
 
     private func save() {
-        switch mode {
-        case .monthly:
-            guard let amt = Double(monthlyAmount.replacingOccurrences(of: ",", with: ".")), amt > 0 else {
-                showError("Введите сумму (> 0)")
-                return
-            }
-            guard !monthlyName.trimmingCharacters(in: .whitespaces).isEmpty else {
-                showError("Введите название")
-                return
-            }
-            let d = Debt(name: monthlyName, input: .monthlyPayment(amount: amt, isMinimum: isMinimum))
-            app.addDebt(d)
-
-        case .loan:
-            guard let p = Double(principal.replacingOccurrences(of: ",", with: ".")), p > 0 else {
-                showError("Введите корректную сумму кредита")
-                return
-            }
-            guard let a = Double(apr.replacingOccurrences(of: ",", with: ".")), a >= 0 else {
-                showError("Введите ставку APR (%)")
-                return
-            }
-            guard let t = Int(termMonths), t > 0 else {
-                showError("Введите срок в месяцах (> 0)")
-                return
-            }
-            let grace = Int(graceMonths) // опционально
-            let min = Double(minPayment.replacingOccurrences(of: ",", with: ".")) // опционально
-
-            guard !loanName.trimmingCharacters(in: .whitespaces).isEmpty else {
-                showError("Введите название")
-                return
-            }
-            let d = Debt(
-                name: loanName,
-                input: .loan(
-                    principal: p,
-                    apr: a,
-                    termMonths: t,
-                    graceMonths: grace,
-                    minPayment: min
-                )
-            )
-            app.addDebt(d)
-        }
-
+        let model = Debt(id: existing?.id ?? UUID(),
+                         title: title.trimmingCharacters(in: .whitespaces),
+                         obligatoryMonthlyPayment: Double(monthlyInt),
+                         currency: currency)
+        if existing == nil { app.addDebt(model) } else { app.updateDebt(model) }
         dismiss()
-    }
-
-    private func showError(_ msg: String) {
-        errorText = msg
-        showError = true
     }
 }
 

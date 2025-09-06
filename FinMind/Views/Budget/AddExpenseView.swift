@@ -4,79 +4,71 @@ struct AddExpenseView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
 
-    @State private var title: String = ""
-    @State private var amount: Decimal? = nil
-    @State private var currency: Currency = .rub
+    var existing: Expense? = nil
 
-    // Новое: разовый / периодический
-    @State private var isOneOff: Bool = false
-    @State private var date: Date = Date()
-    @State private var note: String = ""
+    @State private var title: String = ""
+    @State private var amountInt: Int = 0
+    @State private var currency: Currency = .rub
     @State private var rec: Recurrence = .monthly
+    @State private var isOneOff: Bool = false
+    @State private var date: Date? = nil
 
     var body: some View {
-        NavigationStack {
-            Form {
-                // Основные поля
-                Section {
-                    TextField("Название", text: $title)
-
-                    MoneyTextField(
-                        value: $amount,
-                        fractionDigits: appState.fractionDigits(for: currency),
-                        groupingSeparator: ".",
-                        decimalSeparator: ",",
-                        placeholder: "0"
-                    )
-
-                    Picker("Валюта", selection: $currency) {
-                        ForEach(Currency.supported, id: \.code) { c in
-                            Text("\(c.code) \(c.symbol)").tag(c as Currency)
-                        }
-                    }
-                }
-
-                // Тип расхода
-                Section("Тип") {
-                    Toggle("Разовый", isOn: $isOneOff)
-
-                    if isOneOff {
-                        DatePicker("Дата", selection: $date, displayedComponents: .date)
-                        TextField("Заметка (необязательно)", text: $note)
-                    } else {
-                        Picker("Периодичность", selection: $rec) {
-                            ForEach(Recurrence.allCases) { r in
-                                Text(r.localized).tag(r)
-                            }
-                        }
+        Form {
+            Section {
+                TextField("Название", text: $title)
+                GroupedIntField(value: $amountInt, placeholder: "0")
+                Picker("Валюта", selection: $currency) {
+                    ForEach(Currency.supported) { c in
+                        Text("\(c.code) \(c.symbol)").tag(c)
                     }
                 }
             }
-            .navigationTitle("Новый расход")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") {
-                        let amt = NSDecimalNumber(decimal: amount ?? 0).doubleValue
-                        let kind: ExpenseKind = isOneOff
-                            ? .oneOff(date: date, note: note.isEmpty ? nil : note)
-                            : .recurring(rec)
-
-                        let item = Expense(
-                            id: UUID(),
-                            title: title,
-                            amount: amt,
-                            currency: currency,
-                            kind: kind
-                        )
-                        appState.addExpense(item)
-                        dismiss()
+            Section("Тип") {
+                Toggle("Разовый", isOn: $isOneOff)
+                if isOneOff {
+                    DatePicker("Дата",
+                               selection: Binding(get: { date ?? Date() },
+                                                  set: { date = $0 }),
+                               displayedComponents: .date)
+                } else {
+                    Picker("Периодичность", selection: $rec) {
+                        ForEach(Recurrence.allCases) { Text($0.localized).tag($0) }
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (amount ?? 0) == 0)
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .navigationTitle(existing == nil ? "Новый расход" : "Редактировать расход")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(existing == nil ? "Сохранить" : "Обновить") { save() }
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || amountInt <= 0)
+            }
+        }
+        .onAppear { preload() }
+    }
+
+    private func preload() {
+        guard let e = existing else { return }
+        title = e.title
+        amountInt = Int(e.amount.rounded())
+        currency = e.currency
+        switch e.kind {
+        case .recurring(let r): isOneOff = false; rec = r
+        case .oneOff(let d, _): isOneOff = true; date = d
+        }
+    }
+
+    private func save() {
+        let kind: ExpenseKind = isOneOff ? .oneOff(date: date, note: nil) : .recurring(rec)
+        let model = Expense(id: existing?.id ?? UUID(),
+                            title: title.trimmingCharacters(in: .whitespaces),
+                            amount: Double(amountInt),
+                            currency: currency,
+                            kind: kind)
+        if existing == nil { appState.addExpense(model) } else { appState.updateExpense(model) }
+        dismiss()
     }
 }
