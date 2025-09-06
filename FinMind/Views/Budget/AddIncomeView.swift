@@ -4,7 +4,7 @@ struct AddIncomeView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
 
-    // Если передать запись — откроется режим редактирования
+    /// Если передать запись — экран открывается в режиме редактирования
     var existing: Income? = nil
 
     @State private var title: String = ""
@@ -18,20 +18,26 @@ struct AddIncomeView: View {
         Form {
             Section {
                 TextField("Название", text: $title)
+
+                // Сумма: целые числа, авто-группировка 1 000 000, удаление ведущего 0
                 GroupedIntField(value: $amountInt, placeholder: "0")
+
                 Picker("Валюта", selection: $currency) {
-                    ForEach(Currency.supported) { c in
+                    ForEach(Currency.supported, id: \.code) { c in
                         Text("\(c.code) \(c.symbol)").tag(c)
                     }
                 }
             }
+
             Section("Тип") {
                 Toggle("Разовый", isOn: $isOneOff)
                 if isOneOff {
                     DatePicker("Дата", selection: $date, displayedComponents: .date)
                 } else {
                     Picker("Периодичность", selection: $rec) {
-                        ForEach(Recurrence.allCases) { Text($0.localized).tag($0) }
+                        ForEach(Recurrence.allCases, id: \.self) { r in
+                            Text(r.localized).tag(r)
+                        }
                     }
                 }
             }
@@ -39,10 +45,12 @@ struct AddIncomeView: View {
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle(existing == nil ? "Новый доход" : "Редактировать доход")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Отмена") { dismiss() }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button(existing == nil ? "Сохранить" : "Обновить") { save() }
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || amountInt <= 0)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || amountInt <= 0)
             }
         }
         .onAppear { preload() }
@@ -54,31 +62,33 @@ struct AddIncomeView: View {
         amountInt = Int(inc.amount.rounded())
         currency = inc.currency
         switch inc.kind {
-        case .recurring(let r): isOneOff = false; rec = r
-        case .oneOff(let d, _): isOneOff = true; date = d
+        case .recurring(let r):
+            isOneOff = false
+            rec = r
+        case .oneOff(let d, _):
+            isOneOff = true
+            date = d
         }
     }
 
     private func save() {
-        let kind: IncomeKind = isOneOff ? .oneOff(date: date, note: nil) : .recurring(rec)
-        let model = Income(id: existing?.id ?? UUID(),
-                           title: title.trimmingCharacters(in: .whitespaces),
-                           amount: Double(amountInt),
-                           currency: currency,
-                           kind: kind)
-        if existing == nil { appState.addIncome(model) } else { appState.updateIncome(model) }
-        dismiss()
-    }
-}
+        let kind: IncomeKind = isOneOff
+            ? .oneOff(date: date, note: nil)
+            : .recurring(rec)
 
-private extension Recurrence {
-    var localized: String {
-        switch self {
-        case .daily: "Ежедневно"
-        case .weekly: "Еженедельно"
-        case .monthly: "Ежемесячно"
-        case .quarterly: "Ежеквартально"
-        case .yearly: "Ежегодно"
+        let model = Income(
+            id: existing?.id ?? UUID(),
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            amount: Double(amountInt),
+            currency: currency,
+            kind: kind
+        )
+
+        if existing == nil {
+            appState.addIncome(model)
+        } else {
+            appState.updateIncome(model)
         }
+        dismiss()
     }
 }
