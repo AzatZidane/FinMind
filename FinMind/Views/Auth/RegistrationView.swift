@@ -2,9 +2,9 @@ import SwiftUI
 
 struct RegistrationView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var nickname = ""
-    @State private var isLoading = false
+    @State private var email: String = ""
+    @State private var nickname: String = ""
+    @State private var isLoading: Bool = false
     @State private var errorText: String?
 
     var body: some View {
@@ -30,12 +30,13 @@ struct RegistrationView: View {
                     Button(action: {
                         Task { await doRegister() }
                     }) {
-                        // Текст всегда один и тот же; индикатор поверх — когда isLoading = true.
-                        Text("Зарегистрироваться")
-                            .opacity(isLoading ? 0 : 1)
-                            .overlay {
-                                if isLoading { ProgressView() }
-                            }
+                        // Без if внутри label — только прозрачность/оверлей
+                        ZStack {
+                            Text("Зарегистрироваться")
+                                .opacity(isLoading ? 0 : 1)
+                            ProgressView()
+                                .opacity(isLoading ? 1 : 0)
+                        }
                     }
                     .disabled(!canSubmit || isLoading)
 
@@ -50,13 +51,18 @@ struct RegistrationView: View {
 
     // MARK: - Validation
     private var canSubmit: Bool {
-        validateEmail(email) && nickname.trimmingCharacters(in: .whitespaces).count >= 2
+        validateEmail(email) &&
+        nickname.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
     }
 
     private func validateEmail(_ s: String) -> Bool {
-        // Простая проверка корректности email (без внешних зависимостей на клиенте)
-        let r = #/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/#i
-        return s.wholeMatch(of: r) != nil
+        // Совместимо со старыми Swift: без новых regex‑литералов
+        let pattern = "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return false
+        }
+        let range = NSRange(location: 0, length: s.utf16.count)
+        return regex.firstMatch(in: s, options: [], range: range) != nil
     }
 
     // MARK: - Actions
