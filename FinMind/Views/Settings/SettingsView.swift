@@ -18,7 +18,22 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-
+                Section("Профиль") {
+                    if let p = ProfileStore.shared.profile {
+                        LabeledContent("Имя", value: p.nickname)
+                        LabeledContent("Почта", value: p.email)
+                        if let dt = p.lastUpdated {
+                            LabeledContent("Изменено") {
+                                Text(dt.formatted(date: .abbreviated, time: .shortened))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        NavigationLink("Редактировать") { EditProfileView() }
+                    } else {
+                        Text("Не зарегистрирован").foregroundStyle(.secondary)
+                        NavigationLink("Зарегистрироваться") { RegistrationView() }
+                    }
+                }
                 // MARK: Валюта
                 Section("Валюта") {
                     Picker("Базовая валюта", selection: $app.baseCurrency) {

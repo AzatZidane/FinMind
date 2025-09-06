@@ -1,16 +1,18 @@
 import Foundation
 import Combine
 
-/// Локальное хранилище профиля + вызовы API регистрации
+/// Локальное хранилище профиля + вызовы API регистрации/обновления.
 final class ProfileStore: ObservableObject {
     static let shared = ProfileStore()
-    private init() { load() }
 
     @Published private(set) var profile: UserProfile?
-    var isRegistered: Bool { profile != nil }
 
     private let ud = UserDefaults.standard
     private let key = "user.profile"
+
+    private init() { load() }
+
+    // MARK: - Persist
 
     private func load() {
         if let data = ud.data(forKey: key),
@@ -18,30 +20,56 @@ final class ProfileStore: ObservableObject {
             self.profile = p
         }
     }
+
     private func save() {
-        if let p = profile, let data = try? JSONEncoder().encode(p) {
-            ud.set(data, forKey: key)
+        guard let p = profile, let data = try? JSONEncoder().encode(p) else { return }
+        ud.set(data, forKey: key)
+    }
+
+    /// На всякий случай — удобный сеттер (если где‑то уже использовался).
+    func setProfile(_ p: UserProfile?) {
+        DispatchQueue.main.async {
+            self.profile = p
+            self.save()
         }
     }
 
-    /// Создаёт профиль локально и отправляет на сервер
+    func clearLocal() {
+        ud.removeObject(forKey: key)
+        profile = nil
+    }
+
+    // MARK: - API
+
+    /// Регистрация нового пользователя.
+    /// Сервер сам проставляет created_at (UTC), но локально мы храним createdAt для UI.
     @MainActor
     func register(email: String, nickname: String) async throws {
         let new = UserProfile(
             id: UUID().uuidString,
             email: email,
             nickname: nickname,
-            createdAt: Date()
+            createdAt: Date(),
+            lastUpdated: nil
         )
-        // сначала отправим на сервер; если ок — сохраним локально
+        // Важно: клиент отправляет только id/email/nickname — сервер сам ставит created_at
         try await APIClient.shared.register(profile: new)
         self.profile = new
         save()
     }
 
-    /// Удаление локальной копии (для отладки)
-    func clearLocal() {
-        ud.removeObject(forKey: key)
-        profile = nil
+    /// Обновление имени/почты. Если сервер недоступен — кидаем ошибку (UI покажет твоё сообщение).
+    @MainActor
+    func update(email: String, nickname: String) async throws {
+        guard var current = self.profile else { return }
+        current.email = email
+        current.nickname = nickname
+
+        try await APIClient.shared.updateProfile(profile: current)
+
+        // Успешно: фиксируем локально и проставим lastUpdated (для UI).
+        current.lastUpdated = Date()
+        self.profile = current
+        save()
     }
 }
