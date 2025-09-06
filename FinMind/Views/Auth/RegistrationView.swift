@@ -14,7 +14,7 @@ struct RegistrationView: View {
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                        .autocorrectionDisabled(true)
 
                     TextField("Имя (никнейм)", text: $nickname)
                         .textInputAutocapitalization(.words)
@@ -27,14 +27,15 @@ struct RegistrationView: View {
                 }
 
                 Section {
-                    Button {
+                    Button(action: {
                         Task { await doRegister() }
-                    } label: {
-                        if isLoading {
-                            ProgressView()
-                        } else {
-                            Text("Зарегистрироваться")
-                        }
+                    }) {
+                        // Текст всегда один и тот же; индикатор поверх — когда isLoading = true.
+                        Text("Зарегистрироваться")
+                            .opacity(isLoading ? 0 : 1)
+                            .overlay {
+                                if isLoading { ProgressView() }
+                            }
                     }
                     .disabled(!canSubmit || isLoading)
 
@@ -77,6 +78,5 @@ struct RegistrationView: View {
 }
 
 #Preview {
-    // Предпросмотр без реального сервера
     RegistrationView()
 }
