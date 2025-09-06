@@ -15,6 +15,8 @@ struct BudgetView: View {
     // Листы «Редактировать»
     @State private var editingIncome: Income?
     @State private var editingExpense: Expense?
+    @State private var editingDebt: Debt?          // ← добавлено (редактирование долга)
+    @State private var editingGoal: Goal?          // ← добавлено (редактирование цели)
 
     // Текущий месяц (первый день)
     private var month: Date {
@@ -71,13 +73,11 @@ struct BudgetView: View {
                 case .goal:    AddGoalView().environmentObject(app)
                 }
             }
-            // Редактирование
-            .sheet(item: $editingIncome) { inc in
-                EditIncomeView(income: inc).environmentObject(app)
-            }
-            .sheet(item: $editingExpense) { exp in
-                EditExpenseView(expense: exp).environmentObject(app)
-            }
+            // Редактирование — используем те же экраны с параметром `existing:`
+            .sheet(item: $editingIncome)  { inc in AddIncomeView(existing: inc).environmentObject(app) }
+            .sheet(item: $editingExpense) { exp in AddExpenseView(existing: exp).environmentObject(app) }
+            .sheet(item: $editingDebt)    { d   in AddDebtView(existing: d).environmentObject(app) }     // ← новое
+            .sheet(item: $editingGoal)    { g   in AddGoalView(existing: g).environmentObject(app) }     // ← новое
         }
     }
 
@@ -231,7 +231,19 @@ struct BudgetView: View {
                 Section("Долги") {
                     ForEach(app.debts) { d in
                         debtRow(d)
-                            .swipeActions {
+                            .contextMenu {     // ← добавили меню редактирования
+                                Button { editingDebt = d } label: {
+                                    Label("Редактировать", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) { app.removeDebt(d) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions {     // ← и свайп
+                                Button { editingDebt = d } label: {
+                                    Label("Редакт.", systemImage: "pencil")
+                                }
+                                .tint(.blue)
                                 Button(role: .destructive) { app.removeDebt(d) } label: {
                                     Label("Удалить", systemImage: "trash")
                                 }
@@ -249,7 +261,19 @@ struct BudgetView: View {
                 Section("Цели") {
                     ForEach(app.goals) { g in
                         goalRow(g)
-                            .swipeActions {
+                            .contextMenu {     // ← добавили меню редактирования
+                                Button { editingGoal = g } label: {
+                                    Label("Редактировать", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) { app.removeGoal(g) } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions {     // ← и свайп
+                                Button { editingGoal = g } label: {
+                                    Label("Редакт.", systemImage: "pencil")
+                                }
+                                .tint(.blue)
                                 Button(role: .destructive) { app.removeGoal(g) } label: {
                                     Label("Удалить", systemImage: "trash")
                                 }
