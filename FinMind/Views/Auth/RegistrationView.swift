@@ -15,20 +15,26 @@ struct RegistrationView: View {
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+
                     TextField("Имя (никнейм)", text: $nickname)
                         .textInputAutocapitalization(.words)
                 }
 
                 if let e = errorText {
-                    Text(e).foregroundStyle(.red).font(.footnote)
+                    Text(e)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
                 }
 
                 Section {
                     Button {
                         Task { await doRegister() }
                     } label: {
-                        if isLoading { ProgressView() }
-                        else { Text("Зарегистрироваться") }
+                        if isLoading {
+                            ProgressView()
+                        } else {
+                            Text("Зарегистрироваться")
+                        }
                     }
                     .disabled(!canSubmit || isLoading)
 
@@ -41,26 +47,36 @@ struct RegistrationView: View {
         }
     }
 
+    // MARK: - Validation
     private var canSubmit: Bool {
         validateEmail(email) && nickname.trimmingCharacters(in: .whitespaces).count >= 2
     }
 
     private func validateEmail(_ s: String) -> Bool {
-        // простая проверка
+        // Простая проверка корректности email (без внешних зависимостей на клиенте)
         let r = #/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/#i
         return s.wholeMatch(of: r) != nil
     }
 
+    // MARK: - Actions
     private func doRegister() async {
         errorText = nil
         isLoading = true
         defer { isLoading = false }
+
         do {
-            try await ProfileStore.shared.register(email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                   nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines))
+            try await ProfileStore.shared.register(
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
             dismiss()
         } catch {
             errorText = (error as? LocalizedError)?.errorDescription ?? "Неизвестная ошибка"
         }
     }
+}
+
+#Preview {
+    // Предпросмотр без реального сервера
+    RegistrationView()
 }
