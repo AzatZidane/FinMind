@@ -1,74 +1,79 @@
 import SwiftUI
 
-struct AddExpenseView: View {
-    @EnvironmentObject var appState: AppState
-    @Environment(\.dismiss) var dismiss
+struct AddGoalView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
 
-    var existing: Expense? = nil
+    /// Если передать запись — экран открывается в режиме редактирования
+    var existing: Goal? = nil
 
     @State private var title: String = ""
     @State private var amountInt: Int = 0
     @State private var currency: Currency = .rub
-    @State private var rec: Recurrence = .monthly
-    @State private var isOneOff: Bool = false
-    @State private var date: Date? = nil
+    @State private var withDeadline: Bool = false
+    @State private var deadline: Date = Date()
 
     var body: some View {
         Form {
             Section {
                 TextField("Название", text: $title)
                 GroupedIntField(value: $amountInt, placeholder: "0")
+
                 Picker("Валюта", selection: $currency) {
-                    ForEach(Currency.supported) { c in
+                    ForEach(Currency.supported, id: \.code) { c in
                         Text("\(c.code) \(c.symbol)").tag(c)
                     }
                 }
             }
-            Section("Тип") {
-                Toggle("Разовый", isOn: $isOneOff)
-                if isOneOff {
-                    DatePicker("Дата",
-                               selection: Binding(get: { date ?? Date() },
-                                                  set: { date = $0 }),
-                               displayedComponents: .date)
-                } else {
-                    Picker("Периодичность", selection: $rec) {
-                        ForEach(Recurrence.allCases) { Text($0.localized).tag($0) }
-                    }
+
+            Section("Срок (опционально)") {
+                Toggle("Указать срок", isOn: $withDeadline)
+                if withDeadline {
+                    DatePicker("Дедлайн", selection: $deadline, displayedComponents: .date)
                 }
             }
         }
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle(existing == nil ? "Новый расход" : "Редактировать расход")
+        .navigationTitle(existing == nil ? "Новая цель" : "Редактировать цель")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Отмена") { dismiss() }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button(existing == nil ? "Сохранить" : "Обновить") { save() }
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || amountInt <= 0)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || amountInt <= 0)
             }
         }
         .onAppear { preload() }
     }
 
     private func preload() {
-        guard let e = existing else { return }
-        title = e.title
-        amountInt = Int(e.amount.rounded())
-        currency = e.currency
-        switch e.kind {
-        case .recurring(let r): isOneOff = false; rec = r
-        case .oneOff(let d, _): isOneOff = true; date = d
+        guard let g = existing else { return }
+        title = g.title
+        amountInt = Int(g.targetAmount.rounded())
+        currency = g.currency
+        if let d = g.deadline {
+            withDeadline = true
+            deadline = d
+        } else {
+            withDeadline = false
         }
     }
 
     private func save() {
-        let kind: ExpenseKind = isOneOff ? .oneOff(date: date, note: nil) : .recurring(rec)
-        let model = Expense(id: existing?.id ?? UUID(),
-                            title: title.trimmingCharacters(in: .whitespaces),
-                            amount: Double(amountInt),
-                            currency: currency,
-                            kind: kind)
-        if existing == nil { appState.addExpense(model) } else { appState.updateExpense(model) }
+        let model = Goal(
+            id: existing?.id ?? UUID(),
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            targetAmount: Double(amountInt),
+            currency: currency,
+            deadline: withDeadline ? deadline : nil
+        )
+
+        if existing == nil {
+            app.addGoal(model)
+        } else {
+            app.updateGoal(model)
+        }
         dismiss()
     }
 }
