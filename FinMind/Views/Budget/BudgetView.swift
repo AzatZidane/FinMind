@@ -3,30 +3,38 @@ import SwiftUI
 struct BudgetView: View {
     @EnvironmentObject var app: AppState
 
-    // Курсы
+    // MARK: - Курсы
     @State private var rates: RatesSnapshot?
     @State private var isLoadingRates = false
     @State private var ratesError: String?
 
-    // Листы «Добавить»
+    // MARK: - Листы «Добавить»
     private enum SheetType: Identifiable { case income, expense, debt, goal; var id: Int { hashValue } }
     @State private var activeSheet: SheetType?
 
-    // Листы «Редактировать»
+    // MARK: - Листы «Редактировать»
     @State private var editingIncome: Income?
     @State private var editingExpense: Expense?
     @State private var editingDebt: Debt?
     @State private var editingGoal: Goal?
 
-    // Текущий месяц (первый день)
+    // MARK: - Дата (первый день текущего месяца)
     private var month: Date {
         let cal = Calendar.current
         return cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
     }
 
+    // MARK: - Агрегаты
     private var totalIncomeBase: Double { monthlyIncomeBase(for: month) }
     private var totalExpenseBase: Double { monthlyExpenseBase(for: month) }
     private var netBase: Double { totalIncomeBase - totalExpenseBase }
+
+    private var debtPaymentsThisMonth: Double {
+        // сумма ежемесячных платежей по всем долгам в базовой валюте
+        app.debts.reduce(0) { acc, d in
+            acc + NSDecimalNumber(decimal: app.toBase(Decimal(d.obligatoryMonthlyPayment), from: d.currency)).doubleValue
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -71,7 +79,7 @@ struct BudgetView: View {
                 case .goal:    NavigationStack { AddGoalView().environmentObject(app) }
                 }
             }
-            // Редактирование
+            // Редактирование (те же экраны с existing:)
             .sheet(item: $editingIncome)  { inc in NavigationStack { AddIncomeView(existing: inc).environmentObject(app) } }
             .sheet(item: $editingExpense) { exp in NavigationStack { AddExpenseView(existing: exp).environmentObject(app) } }
             .sheet(item: $editingDebt)    { d   in NavigationStack { AddDebtView(existing: d).environmentObject(app) } }
@@ -79,16 +87,13 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Секция «Сбережения»
+    // MARK: - Сбережения
     private var savingsSection: some View {
         Section("Сбережения") {
-            // 1) «Всего (в RUB)» — гарантированно рисуется как строка списка
             LabeledContent("Всего (в RUB)") {
                 Text(formattedRUB(totalSavingsRub()))
                     .font(.headline.monospacedDigit())
             }
-
-            // 2) «Курсы обновлены …»
             if let r = rates {
                 LabeledContent("Курсы обновлены") {
                     Text(r.updatedAt.formatted(date: .abbreviated, time: .shortened))
@@ -96,20 +101,14 @@ struct BudgetView: View {
                         .monospacedDigit()
                 }
             }
-
-            // 3) Возможная ошибка загрузки курсов
             if let e = ratesError {
                 Text(e).foregroundStyle(.red).font(.footnote)
             }
-
-            // 4) Переход на экран редактирования сбережений
             NavigationLink {
                 EditSavingsView()
             } label: {
                 Label("Редактировать сбережения", systemImage: "pencil")
             }
-
-            // 5) Обновить курсы
             Button {
                 Task { await loadRates(force: true) }
             } label: {
@@ -138,6 +137,14 @@ struct BudgetView: View {
                 Text(app.formatMoney(totalExpenseBase, currency: app.baseCurrency))
                     .font(.headline.monospacedDigit())
             }
+            // Вклад платежей по долгам — для наглядности
+            HStack {
+                Text("в т.ч. платежи по долгам")
+                Spacer()
+                Text(app.formatMoney(debtPaymentsThisMonth, currency: app.baseCurrency))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
             Divider()
             HStack {
                 Text("Итог")
@@ -162,8 +169,7 @@ struct BudgetView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Разделы доходы/расходы/долги/цели
-
+    // MARK: - Разделы
     private var incomesSection: some View {
         Group {
             if !app.incomes.isEmpty {
@@ -227,19 +233,6 @@ struct BudgetView: View {
         }
     }
 
-    private var debtPaymentsThisMonth: Double {
-        app.debts.reduce(0) { $0 + $1.obligatoryMonthlyPayment }
-    }
-
-    // В summaryCard после строки "Расходы (мес.)"
-    HStack {
-        Text("в т.ч. платежи по долгам")
-        Spacer()
-        Text(app.formatMoney(debtPaymentsThisMonth, currency: app.baseCurrency))
-            .font(.subheadline.monospacedDigit())
-            .foregroundStyle(.secondary)
-    }
-
     private var goalsSection: some View {
         Group {
             if !app.goals.isEmpty {
@@ -261,7 +254,7 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Строки
+    // MARK: - Строки списка
     @ViewBuilder private func incomeRow(_ inc: Income) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -302,9 +295,9 @@ struct BudgetView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(g.name)
-                Text(g.deadline.map {
-                    $0.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted))
-                } ?? "Без срока").font(.caption).foregroundStyle(.tertiary)
+                Text(g.deadline.map { $0.formatted(.dateTime.day().month().year()) } ?? "Без срока")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
             Spacer()
             Text(app.formatMoney(g.targetAmount, currency: g.currency))
@@ -312,7 +305,7 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Helpers: подписи типов
+    // MARK: - Подписи типов
     private func kindText(_ k: IncomeKind) -> String {
         switch k {
         case .recurring(let r): return r.localized
@@ -328,59 +321,54 @@ struct BudgetView: View {
         }
     }
 
-    // MARK: - Helpers: месячные суммы в базовой валюте
+    // MARK: - Подсчёты в базовой валюте
     private func monthlyIncomeBase(for month: Date) -> Double {
-        let rec = app.totalNormalizedMonthlyRecurringIncome(for: month)
+        // рекуррентные доходы (уже нормированы помесячно)
+        let recurringBase: Double = app.incomes.reduce(0) { acc, i in
+            let perMonth = i.normalizedMonthlyAmount(for: month)
+            let converted = NSDecimalNumber(decimal: app.toBase(Decimal(perMonth), from: i.currency)).doubleValue
+            return acc + converted
+        }
+        // разовые доходы текущего месяца
         let cal = Calendar.current
-        let oneOff: Decimal = app.incomes.reduce(0) { acc, i in
+        let oneOffBase: Double = app.incomes.reduce(0) { acc, i in
             guard case .oneOff(let d, _) = i.kind,
                   cal.isDate(d, equalTo: month, toGranularity: .month) else { return acc }
-            return acc + app.toBase(Decimal(i.amount), from: i.currency)
+            let converted = NSDecimalNumber(decimal: app.toBase(Decimal(i.amount), from: i.currency)).doubleValue
+            return acc + converted
         }
-        return rec + NSDecimalNumber(decimal: oneOff).doubleValue
+        return recurringBase + oneOffBase
     }
 
-    // Заменить существующую monthlyExpenseBase(for:)
     private func monthlyExpenseBase(for month: Date) -> Double {
-        // Рекуррентные расходы -> к базовой валюте
-        let recurringExpensesBase: Double = app.expenses.reduce(0) { acc, e in
-            let perMonth = e.normalizedMonthlyAmount(for: month)            // Double
-            let converted = NSDecimalNumber(
-                decimal: app.toBase(Decimal(perMonth), from: e.currency)
-            ).doubleValue
+        // рекуррентные расходы
+        let recurringBase: Double = app.expenses.reduce(0) { acc, e in
+            let perMonth = e.normalizedMonthlyAmount(for: month)
+            let converted = NSDecimalNumber(decimal: app.toBase(Decimal(perMonth), from: e.currency)).doubleValue
             return acc + converted
         }
-
-        // Платежи по долгам -> к базовой валюте
-        let debtPaymentsBase: Double = app.debts.reduce(0) { acc, d in
-            let converted = NSDecimalNumber(
-                decimal: app.toBase(Decimal(d.obligatoryMonthlyPayment), from: d.currency)
-            ).doubleValue
+        // платежи по долгам
+        let debtsBase: Double = app.debts.reduce(0) { acc, d in
+            let converted = NSDecimalNumber(decimal: app.toBase(Decimal(d.obligatoryMonthlyPayment), from: d.currency)).doubleValue
             return acc + converted
         }
-
-        // Разовые траты текущего месяца -> к базовой валюте
+        // разовые расходы текущего месяца
         let cal = Calendar.current
         let oneOffBase: Double = app.expenses.reduce(0) { acc, e in
             guard case .oneOff(let date, _) = e.kind,
-                let date, cal.isDate(date, equalTo: month, toGranularity: .month)
-            else { return acc }
-            let converted = NSDecimalNumber(
-                decimal: app.toBase(Decimal(e.amount), from: e.currency)
-            ).doubleValue
+                  let date, cal.isDate(date, equalTo: month, toGranularity: .month) else { return acc }
+            let converted = NSDecimalNumber(decimal: app.toBase(Decimal(e.amount), from: e.currency)).doubleValue
             return acc + converted
         }
-
-        return recurringExpensesBase + debtPaymentsBase + oneOffBase
+        return recurringBase + debtsBase + oneOffBase
     }
-
 
     // MARK: - Сбережения: сумма в RUB (фиат + крипто)
     private func totalSavingsRub() -> Double {
         guard let r = rates else { return 0 }
         var total: Double = 0
 
-        // ФИАТ
+        // Фиат
         for (code, amount) in SavingsStore.shared.fiat {
             guard amount > 0 else { continue }
             let c = code.uppercased()
@@ -389,11 +377,10 @@ struct BudgetView: View {
             } else if c == "USD" {
                 total += amount * r.usdToRub
             } else if let usdToCurr = r.fiatUSD[c], usdToCurr > 0 {
-                total += amount * (r.usdToRub / usdToCurr) // 1 curr = (USD/RATE)
+                total += amount * (r.usdToRub / usdToCurr) // 1 curr = USD/Rate
             }
         }
-
-        // КРИПТО
+        // Крипто
         for (asset, qty) in SavingsStore.shared.cryptoHoldings {
             guard qty > 0, let usd = r.cryptoUsd[asset] else { continue }
             total += qty * usd * r.usdToRub
