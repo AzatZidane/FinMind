@@ -6,6 +6,7 @@ final class ProfileStore: ObservableObject {
     static let shared = ProfileStore()
 
     @Published private(set) var profile: UserProfile?
+    var isRegistered: Bool { profile != nil }   // <-- добавили
 
     private let ud = UserDefaults.standard
     private let key = "user.profile"
@@ -42,7 +43,6 @@ final class ProfileStore: ObservableObject {
     // MARK: - API
 
     /// Регистрация нового пользователя.
-    /// Сервер сам проставляет created_at (UTC), но локально мы храним createdAt для UI.
     @MainActor
     func register(email: String, nickname: String) async throws {
         let new = UserProfile(
@@ -52,13 +52,12 @@ final class ProfileStore: ObservableObject {
             createdAt: Date(),
             lastUpdated: nil
         )
-        // Важно: клиент отправляет только id/email/nickname — сервер сам ставит created_at
-        try await APIClient.shared.register(profile: new)
+        try await APIClient.shared.register(profile: new) // сервер сам ставит created_at (UTC)
         self.profile = new
         save()
     }
 
-    /// Обновление имени/почты. Если сервер недоступен — кидаем ошибку (UI покажет твоё сообщение).
+    /// Обновление имени/почты.
     @MainActor
     func update(email: String, nickname: String) async throws {
         guard var current = self.profile else { return }
