@@ -6,3 +6,10 @@ struct UserProfile: Codable, Identifiable, Equatable {
     var nickname: String
     var createdAt: Date
 }
+struct UserProfile: Codable, Identifiable, Equatable {
+    let id: String
+    var email: String
+    var nickname: String
+    var createdAt: Date
+    var lastUpdated: Date?   // может быть nil
+}
