@@ -1,33 +1,40 @@
 import Foundation
 
 
-// MARK: - Worker config (берём из Info.plist)
+// MARK: - Worker config (чтение из Info.plist)
 private enum WorkerConfig {
     static let authHeader = "x-client-token"
 
     static var baseURL: URL? {
-        guard
-            let s = Bundle.main.object(forInfoDictionaryKey: "WORKER_URL") as? String,
-            !s.isEmpty,
-            let url = URL(string: s)
-        else { return nil }
-        return url
+        let raw = (Bundle.main.object(forInfoDictionaryKey: "WORKER_URL") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return URL(string: raw)
     }
 
     static var token: String {
-        (Bundle.main.object(forInfoDictionaryKey: "CLIENT_TOKEN") as? String) ?? ""
+        (Bundle.main.object(forInfoDictionaryKey: "CLIENT_TOKEN") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    // Включи на время отладки: покажет, что реально видит приложение
+    static func debugPrint() {
+        let urlStr = baseURL?.absoluteString ?? "nil"
+        let tLen = token.count
+        print("[WorkerConfig] url=\(urlStr), tokenLen=\(tLen)")
     }
 }
 
 private enum WorkerError: LocalizedError {
-    case missingConfig, badStatus(Int)
+    case missingConfig, unauthorized, badStatus(Int)
     var errorDescription: String? {
         switch self {
-        case .missingConfig: return "WORKER_URL/CLIENT_TOKEN не заданы в Info.plist (Debug)."
-        case .badStatus(let s): return "Ошибка воркера (\(s))"
+        case .missingConfig: return "WORKER_URL/CLIENT_TOKEN не заданы."
+        case .unauthorized:  return "Неверный CLIENT_TOKEN (401)."
+        case .badStatus(let s): return "Ошибка воркера (\(s))."
         }
     }
 }
+
 
 
 // MARK: - Errors
@@ -227,43 +234,44 @@ extension APIClient {
     }
 
     /// GET /ping — проверка доступности воркера
-    @discardableResult
-    func workerPing() async -> Bool {
-        do {
-            let req = try workerRequest(path: "ping")
-            let (_, resp) = try await session.data(for: req)
-            return (resp as? HTTPURLResponse)?.statusCode == 200
-        } catch {
-            AppLog.e("workerPing: \(error.localizedDescription)")
-            return false
+        @discardableResult
+        func workerPing() async -> Bool {
+            do {
+                let req = try workerRequest(path: "ping")
+                let (_, resp) = try await session.data(for: req)
+                return (resp as? HTTPURLResponse)?.statusCode == 200
+            } catch {
+                AppLog.e("workerPing: \(error.localizedDescription)")
+                return false
+            }
+        }
+
+        struct WorkerChatMessage: Codable { let role: String; let content: String }
+        private struct WorkerChatRequest: Codable {
+            let model: String
+            let messages: [WorkerChatMessage]
+            let temperature: Double?
+        }
+        private struct WorkerChatChoice: Codable { let index: Int; let message: WorkerChatMessage }
+        private struct WorkerChatResponse: Codable { let choices: [WorkerChatChoice] }
+
+        func workerChat(_ messages: [WorkerChatMessage],
+                        temperature: Double? = nil) async throws -> String {
+            let payload = WorkerChatRequest(model: "gpt-4o-mini", messages: messages, temperature: temperature)
+            let body = try JSONEncoder().encode(payload)
+            let req = try workerRequest(path: "v1/chat/completions", method: "POST", body: body)
+
+            let (data, resp) = try await session.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            if code == 401 { throw WorkerError.unauthorized }
+            guard code == 200 else {
+                let snippet = String(data: data.prefix(300), encoding: .utf8) ?? ""
+                AppLog.e("workerChat status \(code) body: \(snippet)")
+                throw WorkerError.badStatus(code)
+            }
+            let decoded = try JSONDecoder().decode(WorkerChatResponse.self, from: data)
+            return decoded.choices.first?.message.content ?? ""
         }
     }
 
-    // DTO под OpenAI Chat Completions (через воркер)
-    struct WorkerChatMessage: Codable { let role: String; let content: String }
-    private struct WorkerChatRequest: Codable {
-        let model: String
-        let messages: [WorkerChatMessage]
-        let temperature: Double?
-    }
-    private struct WorkerChatChoice: Codable { let index: Int; let message: WorkerChatMessage }
-    private struct WorkerChatResponse: Codable { let choices: [WorkerChatChoice] }
-
-    /// POST /v1/chat/completions — прокси через воркер на OpenAI
-    func workerChat(_ messages: [WorkerChatMessage],
-                    temperature: Double? = nil) async throws -> String {
-        let payload = WorkerChatRequest(model: "gpt-4o-mini", messages: messages, temperature: temperature)
-        let body = try JSONEncoder().encode(payload)
-        let req = try workerRequest(path: "v1/chat/completions", method: "POST", body: body)
-
-        let (data, resp) = try await session.data(for: req)
-        let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
-        guard code == 200 else {
-            let snippet = String(data: data.prefix(400), encoding: .utf8) ?? ""
-            AppLog.e("workerChat status \(code) body: \(snippet)")
-            throw WorkerError.badStatus(code)
-        }
-        let decoded = try JSONDecoder().decode(WorkerChatResponse.self, from: data)
-        return decoded.choices.first?.message.content ?? ""
-    }
 }
