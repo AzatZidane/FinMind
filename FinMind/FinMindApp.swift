@@ -4,16 +4,17 @@ import SwiftUI
 struct FinMindApp: App {
     @StateObject private var appState: AppState
 
-    init() {    
+    init() {
         let loaded = Persistence.shared.load()
-        _appState = StateObject(wrappedValue: loaded)        
+        _appState = StateObject(wrappedValue: loaded)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
-                .preferredColorScheme(appState.appearance.swiftUIColorScheme) // тема из настроек
+                // тема берётся из настроек пользователя (AppState)
+                .preferredColorScheme(appState.appearance.swiftUIColorScheme)
                 .onAppear { appState.startAutoSave() }
         }
     }
