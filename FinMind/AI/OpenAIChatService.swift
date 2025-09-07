@@ -8,7 +8,7 @@ struct ChatMessage: Codable { let role: ChatRole; let content: String }
 enum OpenAIKeyError: LocalizedError {
     case missing
     var errorDescription: String? {
-        "OPENAI_API_KEY не найден. При работе через прокси он не требуется в клиенте."
+        "OAK не найден"
     }
 }
 
