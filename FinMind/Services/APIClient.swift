@@ -157,3 +157,17 @@ final class APIClient {
         }
     }
 }
+enum APIClient {
+    static let baseURL: URL = {
+        guard
+            let dict = Bundle.main.infoDictionary,
+            let raw = dict["API_BASE_URL"] as? String,
+            let url = URL(string: raw)
+        else {
+            fatalError("API_BASE_URL is missing in Info.plist")
+        }
+        return url
+    }()
+    // ... остальной код клиента
+}
+
