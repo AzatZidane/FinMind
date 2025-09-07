@@ -1,2 +1,11 @@
 regex:"***REMOVED***"]+"==>"***REMOVED***"
 regex:sk-[A-Za-z0-9_-]{20,}==>***REMOVED***
+***REMOVED***
+regex:x-client-token:\s*[A-Za-z0-9._=\-+/]{16,}==>x-client-token: ***REMOVED***
+
+***REMOVED***
+regex:Authorization:\s*Bearer\s+[A-Za-z0-9._\-=+/]{20,}==>Authorization: Bearer ***REMOVED***
+
+***REMOVED***
+regex:CLIENT_TOKEN\s*=\s*"[^"]{8,}"==>CLIENT_TOKEN="***REMOVED***"
+regex:CLIENT_TOKEN\s*=\s*[A-Za-z0-9._=\-+/]{8,}==>CLIENT_TOKEN=***REMOVED***
