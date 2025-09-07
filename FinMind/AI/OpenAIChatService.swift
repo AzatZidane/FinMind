@@ -1,6 +1,18 @@
 import Foundation
 
 // MARK: - Chat types used across the app
+private func workerBase() throws -> URL {
+    guard
+      let raw = Bundle.main.object(forInfoDictionaryKey: "WORKER_URL") as? String,
+      let url = URL(string: raw)
+    else { throw URLError(.badURL) }
+    return url
+}
+
+private func workerToken() -> String {
+    (Bundle.main.object(forInfoDictionaryKey: "CLIENT_TOKEN") as? String ?? "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+}
 
 enum ChatRole: String, Codable { case system, user, assistant }
 struct ChatMessage: Codable { let role: ChatRole; let content: String }
