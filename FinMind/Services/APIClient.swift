@@ -18,25 +18,28 @@ enum APIError: LocalizedError {
     }
 }
 
-// MARK: - Base URL (симулятор vs устройство)
-
+// MARK: - Fallback base URL (симулятор vs устройство)
+// Если нет ключа API_BASE_URL в Info.plist — используем это значение.
 enum API {
 #if targetEnvironment(simulator)
-    // Симулятор на том же Mac
     static var baseURL: String = "http://127.0.0.1:8000"
 #else
-    // Реальное устройство в одной сети с ПК
-    // ЗАМЕНИ на свой IPv4 (ipconfig): 192.168.0.105 — как у тебя сейчас
+    // ЗАМЕНИ при необходимости на свой IPv4 для локальной сети
     static var baseURL: String = "http://192.168.0.105:8000"
 #endif
 }
 
 // MARK: - Client
 
+/// Единый сетевой клиент приложения.
+/// Приоритет выбора базового URL:
+/// 1) Info.plist → ключ `API_BASE_URL` (prod/dev);
+/// 2) Fallback из `API.baseURL` (симулятор/устройство).
 final class APIClient {
     static let shared = APIClient()
     private init() {}
 
+    // URLSession с аккуратными таймаутами
     private let session: URLSession = {
         let c = URLSessionConfiguration.ephemeral
         c.timeoutIntervalForRequest = 12
@@ -45,7 +48,24 @@ final class APIClient {
         return URLSession(configuration: c)
     }()
 
-    // DTO
+    // MARK: Base URL
+
+    private var baseURL: URL {
+        if
+            let raw = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
+            let url = URL(string: raw)
+        {
+            return url
+        }
+        // fallback (симулятор/девайс)
+        guard let url = URL(string: API.baseURL) else {
+            fatalError("Invalid fallback API.baseURL")
+        }
+        return url
+    }
+
+    // MARK: DTO
+
     private struct RegisterDTO: Codable {
         let id: String
         let email: String
@@ -64,9 +84,9 @@ final class APIClient {
 
     // MARK: - Endpoints
 
-    /// Регистрация. Сервер сам проставляет created_at, мы шлём только id/email/nickname.
+    /// Регистрация пользователя (server assigns created_at).
     func register(profile: UserProfile) async throws {
-        guard let url = URL(string: "\(API.baseURL)/api/register") else { throw APIError.badURL }
+        let url = baseURL.appendingPathComponent("api/register")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -78,20 +98,18 @@ final class APIClient {
         do {
             let (data, resp) = try await session.data(for: req)
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            if status != 200 {
+            guard status == 200 else {
                 AppLog.e("register bad status \(status)")
                 throw APIError.badStatus(status)
             }
-            if let ok = try? JSONDecoder().decode(OkDTO.self, from: data), ok.ok {
-                return
+            guard let ok = try? JSONDecoder().decode(OkDTO.self, from: data), ok.ok else {
+                throw APIError.decoding
             }
-            throw APIError.decoding
         } catch {
             if let e = error as? URLError {
                 AppLog.e("register URLError \(e.code.rawValue): \(e.localizedDescription)")
                 if e.code == .appTransportSecurityRequiresSecureConnection {
-                    // ATS блокирует http — подсказка в лог
-                    AppLog.e("ATS: включите исключение в Info.plist (Debug) или используйте HTTPS")
+                    AppLog.e("ATS: для http добавьте исключение в Info.plist (Debug) или используйте HTTPS")
                 }
             } else {
                 AppLog.e("register error: \(error.localizedDescription)")
@@ -100,9 +118,9 @@ final class APIClient {
         }
     }
 
-    /// Обновление профиля (имя/почта).
+    /// Обновление профиля.
     func updateProfile(profile: UserProfile) async throws {
-        guard let url = URL(string: "\(API.baseURL)/api/update_profile") else { throw APIError.badURL }
+        let url = baseURL.appendingPathComponent("api/update_profile")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -114,7 +132,7 @@ final class APIClient {
         do {
             let (data, resp) = try await session.data(for: req)
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            if status != 200 {
+            guard status == 200 else {
                 let snippet = String(data: data.prefix(200), encoding: .utf8) ?? ""
                 AppLog.e("updateProfile bad status \(status) body: \(snippet)")
                 throw APIError.badStatus(status)
@@ -129,9 +147,9 @@ final class APIClient {
         }
     }
 
-    /// Отправка обратной связи (ID пользователя + текст).
+    /// Обратная связь (ID пользователя + текст сообщения).
     func sendFeedback(userId: String, message: String) async throws {
-        guard let url = URL(string: "\(API.baseURL)/api/feedback") else { throw APIError.badURL }
+        let url = baseURL.appendingPathComponent("api/feedback")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -143,7 +161,7 @@ final class APIClient {
         do {
             let (_, resp) = try await session.data(for: req)
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            if status != 200 {
+            guard status == 200 else {
                 AppLog.e("feedback bad status \(status)")
                 throw APIError.badStatus(status)
             }
@@ -157,17 +175,3 @@ final class APIClient {
         }
     }
 }
-enum APIClient {
-    static let baseURL: URL = {
-        guard
-            let dict = Bundle.main.infoDictionary,
-            let raw = dict["API_BASE_URL"] as? String,
-            let url = URL(string: raw)
-        else {
-            fatalError("API_BASE_URL is missing in Info.plist")
-        }
-        return url
-    }()
-    // ... остальной код клиента
-}
-
