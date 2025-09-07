@@ -28,3 +28,9 @@ Carthage/Build/
 .DS_Store
 *.orig
 *.rej
+
+# Worker
+Worker/.dev.vars
+Worker/**/node_modules/
+Worker/.wrangler/
+
