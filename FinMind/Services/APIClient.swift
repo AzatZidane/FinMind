@@ -210,7 +210,7 @@ extension APIClient {
                     temperature: Double? = nil) async throws -> String {
         let payload = WorkerChatRequest(model: "gpt-4o-mini", messages: messages, temperature: temperature)
         let body = try JSONEncoder().encode(payload)
-        let req  = try workerRequest(path: "v1/chat/completions", method: "POST", body: body)
+        let req  = try workerRequest(path: "v1/advise", method: "POST", body: body)
 
         let (data, resp) = try await session.data(for: req)
         let code = (resp as? HTTPURLResponse)?.statusCode ?? -1

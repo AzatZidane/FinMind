@@ -1,53 +1,148 @@
-const AUTH_HEADER = 'x-client-token';
-const CORS_HEADERS = {
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Token',
-  'Vary': 'Origin',
-};
-const cors = (req) => ({ 'Access-Control-Allow-Origin': req.headers.get('Origin') ?? '*', ...CORS_HEADERS });
+// index.js (Cloudflare Worker, РІР°СЂРёР°РЅС‚ РїРѕРґ CLIENT_TOKEN)
+
+const textEncoder = new TextEncoder();
+
+function b64(ab) {
+  let s = "";
+  const bytes = new Uint8Array(ab);
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+
+async function hmacSHA256(key, msg) {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const mac = await crypto.subtle.sign("HMAC", cryptoKey, textEncoder.encode(msg));
+  return b64(mac);
+}
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
+
+function json(status, body, extraHeaders) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...(extraHeaders || {})
+    },
+  });
+}
+
+async function validateClient(req, env) {
+  const token = req.headers.get("x-fm-token") || "";
+  const tsStr = req.headers.get("x-fm-ts") || "";
+  const bundle = req.headers.get("x-fm-bundle") || "";
+  const device = req.headers.get("x-fm-device") || "";
+
+  if (!token || !tsStr) {
+    return { ok: false, res: json(401, { error: "WORKER_URL/CLIENT_TOKEN not provided" }) };
+  }
+
+  const ts = Number(tsStr);
+  if (!Number.isFinite(ts)) {
+    return { ok: false, res: json(401, { error: "Bad timestamp" }) };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ts) > 15 * 60) {
+    return { ok: false, res: json(401, { error: "Token expired" }) };
+  }
+
+  if (env.ALLOWED_BUNDLES) {
+    const allowed = env.ALLOWED_BUNDLES.split(",").map(s => s.trim()).filter(Boolean);
+    if (bundle && !allowed.includes(bundle)) {
+      return { ok: false, res: json(403, { error: "Forbidden bundle" }) };
+    }
+  }
+
+  const rawSecret = textEncoder.encode(env.CLIENT_TOKEN); // <в”Ђв”Ђ Р·РґРµСЃСЊ CLIENT_TOKEN
+  const message = `${bundle}.${device}.${ts}`;
+  const expected = await hmacSHA256(rawSecret, message);
+
+  if (!timingSafeEqual(expected, token)) {
+    return { ok: false, res: json(401, { error: "Invalid CLIENT_TOKEN" }) };
+  }
+
+  return { ok: true };
+}
+
+async function handleChat(req, env) {
+  const auth = await validateClient(req, env);
+  if (!auth.ok) return auth.res;
+
+  let payload = null;
+  try { payload = await req.json(); } catch {}
+  if (!payload || typeof payload.text !== "string" || !payload.text.trim()) {
+    return json(400, { error: "Text is required" });
+  }
+
+  const model = payload.model || "gpt-4o-mini";
+  const system = payload.system || "РўС‹ вЂ” С„РёРЅР°РЅСЃРѕРІС‹Р№ СЃРѕРІРµС‚РЅРёРє. РћС‚РІРµС‡Р°Р№ РєРѕСЂРѕС‚РєРѕ Рё РїРѕ РґРµР»Сѓ.";
+  const temperature = Number.isFinite(payload.temperature) ? payload.temperature : 0.2;
+
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${env.OPENAI_API_KEY}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model,
+      temperature,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: payload.text }
+      ]
+    })
+  });
+
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    return json(r.status, { error: "OpenAI error", detail: t || r.statusText });
+  }
+
+  const data = await r.json();
+  const reply = data.choices?.[0]?.message?.content ?? "";
+  return json(200, { reply, model });
+}
 
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+  async fetch(req, env) {
+    const url = new URL(req.url);
 
-    // CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: cors(request) });
-    }
-
-    // Проверка клиентского токена
-    const token = request.headers.get(AUTH_HEADER)
-      ?? (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-    if (!token || token !== env.CLIENT_TOKEN) {
-      return new Response('Unauthorized', { status: 401, headers: cors(request) });
-    }
-
-    // healthcheck
-    if (url.pathname === '/ping') {
-      return new Response('pong', { headers: cors(request) });
-    }
-
-    // Прокси к OpenAI (пути /v1/)
-    if (url.pathname.startsWith('/v1/')) {
-      const upstream = new URL('https://api.openai.com' + url.pathname + url.search);
-      const hdrs = new Headers({
-        'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-        'Content-Type': request.headers.get('Content-Type') ?? 'application/json',
-        'Accept': request.headers.get('Accept') ?? 'application/json'
+    if (req.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-headers": "content-type, x-fm-token, x-fm-ts, x-fm-bundle, x-fm-device",
+          "access-control-allow-methods": "POST, OPTIONS",
+          "access-control-max-age": "86400"
+        }
       });
-      const res = await fetch(upstream, {
-        method: request.method,
-        headers: hdrs,
-        body: request.body,
-        redirect: 'manual',
-      });
-      const out = new Headers(res.headers);
-      for (const h of ['www-authenticate','alt-svc']) out.delete(h);
-      const extra = cors(request);
-      for (const [k,v] of Object.entries(extra)) out.set(k,v);
-      return new Response(res.body, { status: res.status, headers: out });
     }
 
-    return new Response('Not Found', { status: 404, headers: cors(request) });
+    if (url.pathname === "/v1/advise" && req.method === "POST") {
+      try {
+        const res = await handleChat(req, env);
+        res.headers.set("access-control-allow-origin", "*");
+        return res;
+      } catch (e) {
+        return json(500, { error: "Worker failure", detail: String(e?.message || e) });
+      }
+    }
+
+    return json(404, { error: "Not found" });
   }
 };
