@@ -112,7 +112,7 @@ final class ChatVM: ObservableObject {
     @Published var input = ""
     @Published var isStreaming = false
 
-    private let service = OpenAIChatService()
+    private let service = OpenAIChatService.shared
     private let storage = ChatStorage.shared
 
     init() {
