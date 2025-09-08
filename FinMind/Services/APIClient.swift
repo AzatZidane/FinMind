@@ -131,25 +131,45 @@ final class APIClient {
 }
 
 // MARK: - Конфиг воркера
-private enum WorkerConfig {
-    static let authHeader = "x-client-token"
+import CryptoKit
+import UIKit
 
+// MARK: - Конфиг воркера (правильная генерация токена)
+private enum WorkerConfig {
     static var baseURL: URL? {
         let raw = (Bundle.main.object(forInfoDictionaryKey: "WORKER_URL") as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return URL(string: raw)
     }
 
-    static var token: String {
+    static var secret: String {
         (Bundle.main.object(forInfoDictionaryKey: "CLIENT_TOKEN") as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    static func debugPrint() {
-        let urlStr = baseURL?.absoluteString ?? "nil"
-        let t = token
-        let preview = t.isEmpty ? "EMPTY" : "\(t.prefix(3))…\(t.suffix(3))"
-        print("[WorkerConfig] url=\(urlStr), tokenLen=\(t.count), tokenPreview=\(preview)")
+    static func makeHeaders() -> [String: String]? {
+        guard !secret.isEmpty else { return nil }
+
+        let ts = Int64(Date().timeIntervalSince1970)
+        let bundle = Bundle.main.bundleIdentifier ?? "unknown.bundle"
+        let device = UIDevice.current.identifierForVendor?.uuidString ?? "unknown-device"
+        let message = "\(bundle).\(device).\(ts)"
+
+        let key = SymmetricKey(data: Data(secret.utf8))
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: key)
+        let token = Data(mac).base64EncodedString()
+
+        // Debug
+        let preview = token.prefix(3) + "…" + token.suffix(3)
+        print("[WorkerConfig] url=\(baseURL?.absoluteString ?? "nil"), tokenLen=\(token.count), tokenPreview=\(preview)")
+
+        return [
+            "X-FM-Token": token,
+            "X-FM-TS": String(ts),
+            "X-FM-Bundle": bundle,
+            "X-FM-Device": device,
+            "Content-Type": "application/json"
+        ]
     }
 }
 
@@ -164,6 +184,7 @@ private enum WorkerError: LocalizedError {
     }
 }
 
+
 // MARK: - Воркеры (ping + chat)
 extension APIClient {
     private func workerRequest(path: String,
@@ -176,7 +197,10 @@ extension APIClient {
         }
         var req = URLRequest(url: base.appendingPathComponent(path))
         req.httpMethod = method
-        req.setValue(WorkerConfig.token, forHTTPHeaderField: WorkerConfig.authHeader)
+        guard let headers = WorkerConfig.makeHeaders() else {
+            throw WorkerError.missingConfig
+        }
+        for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         if let body = body {
             req.httpBody = body
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
