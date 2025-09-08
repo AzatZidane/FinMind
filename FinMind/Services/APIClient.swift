@@ -91,14 +91,25 @@ final class APIClient {
         req.httpBody = try JSONEncoder().encode(dto)
 
         let (data, resp) = try await session.data(for: req)
-        let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-        guard status == 200 else {
-            AppLog.e("register bad status \(status)")
-            throw APIError.badStatus(status)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+
+        struct ErrBody: Codable { let error: String?; let detail: String? }
+
+        if code != 200 {
+            if let eb = try? JSONDecoder().decode(ErrBody.self, from: data) {
+                let human = eb.detail ?? eb.error ?? "unknown"
+                AppLog.e("workerChat status \(code): \(human)")
+                if code == 401 { throw WorkerError.unauthorized }
+                throw WorkerError.badStatus(code)
+            } else {
+                let snippet = String(data: data.prefix(300), encoding: .utf8) ?? ""
+                AppLog.e("workerChat status \(code) body: \(snippet)")
+                if code == 401 { throw WorkerError.unauthorized }
+                throw WorkerError.badStatus(code)
+            }
         }
-        guard let ok = try? JSONDecoder().decode(OkDTO.self, from: data), ok.ok else {
-            throw APIError.decoding
-        }
+
+
     }
 
     func updateProfile(profile: UserProfile) async throws {
@@ -223,10 +234,10 @@ extension APIClient {
     @discardableResult
     func workerPing() async -> Bool {
         do {
-            let req = try workerRequest(path: "v1/advise", method: "OPTIONS")
+            let req = try workerRequest(path: "ping", method: "GET")
             let (_, resp) = try await session.data(for: req)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            return code == 204 || code == 200
+            return code == 200
         } catch {
             AppLog.e("workerPing: \(error.localizedDescription)")
             return false
