@@ -8,8 +8,7 @@ struct SettingsView: View {
     @State private var showWipeAlert = false
     @State private var wipeResult: String?
 
-    // Новый контакт для поддержки
-    private let supportEmail = "ismagilowazaat@yandex.ru"
+    private let supportEmail = "ismagilovazat48@gmail.com"
 
     var body: some View {
         NavigationStack {
@@ -36,10 +35,8 @@ struct SettingsView: View {
                 // MARK: Отображение
                 Section("Отображение") {
                     Toggle("Показывать копейки", isOn: $app.useCents)
-
-                    // Убрали "Как в системе": оставляем только Светлая/Тёмная
                     Picker("Тема", selection: $app.appearance) {
-                        ForEach(AppAppearance.allCases.filter { $0 != .system }, id: \.self) { ap in
+                        ForEach(AppAppearance.allCases, id: \.self) { ap in
                             Text(ap.title).tag(ap as AppAppearance)
                         }
                     }
@@ -69,8 +66,7 @@ struct SettingsView: View {
                     Button {
                         let subject = "FinMind — отчёт об ошибке"
                         let body = supportBody()
-                        let allowed = CharacterSet.urlQueryAllowed
-                        let mailto = "mailto:\(supportEmail)?subject=\(subject.addingPercentEncoding(withAllowedCharacters: allowed)!)&body=\(body.addingPercentEncoding(withAllowedCharacters: allowed)!)"
+                        let mailto = "mailto:\(supportEmail)?subject=\(subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)&body=\(body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
                         if let url = URL(string: mailto) { UIApplication.shared.open(url) }
                     } label: {
                         Label("Сообщить об ошибке", systemImage: "ladybug")
@@ -80,7 +76,7 @@ struct SettingsView: View {
                 // MARK: О приложении
                 Section("О приложении") {
                     NavigationLink {
-                        PrivacyPolicyView() // локальный экран политики
+                        PrivacyPolicyView() // или веб-экран с твоим GitHub Pages
                     } label: {
                         Label("Политика конфиденциальности", systemImage: "doc.text.magnifyingglass")
                     }
@@ -101,12 +97,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Настройки")
-            // Миграция существующего значения .system → .dark при первом заходе в экран
-            .onAppear {
-                if app.appearance == .system {
-                    app.appearance = .dark
-                }
-            }
             .alert("Удалить все данные?", isPresented: $showWipeAlert) {
                 Button("Отмена", role: .cancel) {}
                 Button("Удалить", role: .destructive) { wipeAllData() }
@@ -175,10 +165,8 @@ struct SettingsView: View {
         }
 
         // Удаляем элементы Keychain для service = "FinMind"
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "FinMind"
-        ]
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: "FinMind"]
         SecItemDelete(query as CFDictionary)
 
         URLCache.shared.removeAllCachedResponses()
@@ -192,11 +180,11 @@ extension Bundle {
     var appVersion: String { object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?" }
     var appBuild: String { object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?" }
 }
-
 // Drop-in: чистим iCloud KVS (NSUbiquitousKeyValueStore) целиком
 extension NSUbiquitousKeyValueStore {
     /// Полностью очищает iCloud KVS и делает synchronize().
     func removeAll() {
+        // dictionaryRepresentation возвращает снимок всех ключей/значений
         for key in dictionaryRepresentation.keys {
             removeObject(forKey: key)
         }
