@@ -82,4 +82,33 @@ final class OpenAIChatService {
         onDelta(text)
         onFinish()
     }
+    @MainActor
+    func diagnose400() async {
+        do {
+            let base = try workerBase() // читает WORKER_URL из Info.plist
+            let url = base.appendingPathComponent("/v1/chat/completions")
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.addValue(workerToken(), forHTTPHeaderField: "x-client-token") // читает CLIENT_TOKEN из Info.plist
+
+            let body: [String: Any] = [
+                "model": "gpt-4o-mini",
+                "messages": [
+                    ["role": "user", "content": "Ответь только числом: 2+2"]
+                ],
+                "temperature": 0
+            ]
+
+            req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            print("diagnose400 status =", status)
+            print("diagnose400 body =", String(data: data, encoding: .utf8) ?? "<non-utf8>")
+
+        } catch {
+            print("diagnose400 error:", error.localizedDescription)
+        }
+    }
 }
