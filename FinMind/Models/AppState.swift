@@ -285,3 +285,103 @@ final class AppState: ObservableObject, Codable {
 
     // updateRates() — без изменений
 }
+// MARK: - Advisor prompt (датасводка + названия долгов/целей)
+import Foundation
+
+extension AppState {
+
+    /// Формат валюты с учётом настроек и базовой валюты
+    private func fm(_ value: Double, currency: Currency? = nil) -> String {
+        formatMoney(value, currency: currency) // уже реализовано в AppState
+    }
+
+    /// Чтение значения по имени поля (безопасно для любых моделей через Mirror)
+    private func mirrorValue<T>(_ any: Any, keys: [String], as type: T.Type = T.self) -> T? {
+        let m = Mirror(reflecting: any)
+        for child in m.children {
+            if let label = child.label, keys.contains(label),
+               let v = child.value as? T {
+                return v
+            }
+        }
+        return nil
+    }
+
+    /// Строка для одного долга: "• Кредит Альфа: остаток …, ставка …%, мин. платёж …, срок … мес."
+    private func debtLine(_ d: Debt) -> String {
+        let name = mirrorValue(d, keys: ["name", "title"], as: String.self) ?? "Долг"
+        let principal = mirrorValue(d, keys: ["principal", "balance", "remaining", "outstanding", "amount"], as: Double.self)
+        let apr       = mirrorValue(d, keys: ["apr", "rate", "interestRate", "annualRatePercent"], as: Double.self)
+        let minPay    = mirrorValue(d, keys: ["obligatoryMonthlyPayment", "monthlyPayment", "minPayment"], as: Double.self)
+        let months    = mirrorValue(d, keys: ["termMonths", "monthsLeft", "months", "term"], as: Int.self)
+        let cur       = mirrorValue(d, keys: ["currency"], as: Currency.self)
+
+        var parts: [String] = []
+        if let principal { parts.append("остаток \(fm(principal, currency: cur))") }
+        if let apr       { parts.append("ставка \(String(format: "%.2f", apr))%") }
+        if let minPay    { parts.append("мин. платёж \(fm(minPay, currency: cur))") }
+        if let months    { parts.append("срок \(months) мес.") }
+
+        return "• \(name)" + (parts.isEmpty ? "" : ": " + parts.joined(separator: ", "))
+    }
+
+    /// Строка для одной цели: "• Резерв: цель …, накоплено …, дедлайн …"
+    private func goalLine(_ g: Goal) -> String {
+        let name = mirrorValue(g, keys: ["name", "title"], as: String.self) ?? "Цель"
+        let target = mirrorValue(g, keys: ["targetAmount", "goalAmount", "target", "amount"], as: Double.self)
+        let saved  = mirrorValue(g, keys: ["saved", "current", "progress", "accumulated", "balance"], as: Double.self)
+        let cur    = mirrorValue(g, keys: ["currency"], as: Currency.self)
+        let dl: Date? = mirrorValue(g, keys: ["deadline", "dueDate", "targetDate", "date"], as: Date.self)
+
+        var parts: [String] = []
+        if let target { parts.append("цель \(fm(target, currency: cur))") }
+        if let saved, saved > 0 { parts.append("накоплено \(fm(saved, currency: cur))") }
+        if let dl {
+            let df = DateFormatter(); df.dateFormat = "dd.MM.yyyy"
+            parts.append("дедлайн \(df.string(from: dl))")
+        }
+
+        return "• \(name)" + (parts.isEmpty ? "" : ": " + parts.joined(separator: ", "))
+    }
+
+    /// Системный промпт для советника: доходы/расходы + перечень долгов и целей с названиями.
+    @MainActor
+    func advisorSystemPrompt() -> String {
+        let month = Date()
+
+        // Итоги из твоих существующих методов:
+        let incomeM = totalNormalizedMonthlyRecurringIncome(for: month)
+        let expenseM = totalNormalizedMonthlyRecurringExpense(for: month) // включает мин.платежи по долгам
+        let minPays = debts.reduce(into: 0.0) { acc, d in
+            acc += mirrorValue(d, keys: ["obligatoryMonthlyPayment", "monthlyPayment", "minPayment"], as: Double.self) ?? 0
+        }
+
+        var lines: [String] = []
+
+        lines.append("""
+        Ты — финансовый советник в приложении FinMind. Отвечай только по теме личных финансов (бюджет, подушка, долги, цели, страхование, налоги/вычеты в общем виде).
+        Говори кратко и по делу, прямо по данным пользователя, с понятными числами и формулами там, где нужно.
+        """)
+
+        lines.append("Сводка (месяц): доходы ≈ \(fm(incomeM)), расходы (вкл. мин.платежи по долгам) ≈ \(fm(expenseM)), мин.платежи по долгам ≈ \(fm(minPays)).")
+
+        if debts.isEmpty {
+            lines.append("Долги: отсутствуют.")
+        } else {
+            lines.append("Долги:")
+            debts.forEach { lines.append(debtLine($0)) }
+        }
+
+        if goals.isEmpty {
+            lines.append("Цели: отсутствуют.")
+        } else {
+            lines.append("Цели:")
+            goals.forEach { lines.append(goalLine($0)) }
+        }
+
+        lines.append("""
+        Если данных для точного расчёта по долгу/цели не хватает — коротко уточни недостающее (сумма, ставка годовая %, срок, дедлайн и т. п.) и сразу рассчитай.
+        """)
+        return lines.joined(separator: "\n")
+    }
+}
