@@ -28,6 +28,25 @@ struct ChatMessage: Codable { let role: ChatRole; let content: String }
 final class OpenAIChatService {
     static let shared = OpenAIChatService()
     private init() {}
+    // Добавь внутрь OpenAIChatService
+    @MainActor
+    func debugPrintWorkerConfig() {
+        do {
+            let url = try workerBase()
+            print("WORKER_URL =", url.absoluteString)
+        } catch {
+            print("WORKER_URL invalid:", error.localizedDescription)
+        }
+
+        let t = workerToken()
+        print("CLIENT_TOKEN length:", t.count)
+        if t.count > 6 {
+            let preview = "\(t.prefix(3))...\(t.suffix(3))"
+            print("CLIENT_TOKEN preview:", preview)
+        } else {
+            print("CLIENT_TOKEN preview:", t)
+        }
+    }
 
     /// Модель и температура передаются на воркер (см. APIClient.workerChat).
     var model: String = "gpt-4o-mini"
