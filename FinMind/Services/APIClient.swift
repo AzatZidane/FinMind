@@ -2,9 +2,11 @@
 //  APIClient.swift
 //  FinMind
 //
-//  Полностью обновлён: добавлена HMAC-авторизация для Cloudflare Worker,
-//  исправлен путь на /v1/advise и формат запроса/ответа воркера.
-//  (замена прежней версии файла) // основано на текущем проекте:contentReference[oaicite:0]{index=0}
+//  Обновлено:
+//  - Убран HMAC и кастомные заголовки; используем x-client-token из Info.plist
+//  - Воркера зовём по пути /v1/chat/completions (а не /v1/advise)
+//  - Правильный JSON: { model, messages: [ {role, content} ], temperature, max_tokens? }
+//  - Пинг воркера: GET /healthz
 //
 
 import Foundation
@@ -26,7 +28,7 @@ enum APIError: LocalizedError {
     }
 }
 
-// MARK: - Fallback base URL (симулятор vs устройство)
+// MARK: - Fallback base URL (симулятор vs устройство) — для твоего бэкенда, не для воркера
 enum API {
 #if targetEnvironment(simulator)
     static var baseURL: String = "http://127.0.0.1:8000"
@@ -42,13 +44,13 @@ final class APIClient {
 
     let session: URLSession = {
         let c = URLSessionConfiguration.ephemeral
-        c.timeoutIntervalForRequest = 12
-        c.timeoutIntervalForResource = 15
+        c.timeoutIntervalForRequest = 20
+        c.timeoutIntervalForResource = 30
         c.waitsForConnectivity = true
         return URLSession(configuration: c)
     }()
 
-    // MARK: Base URL
+    // MARK: Base URL твоего бэкенда (не воркера)
     private var baseURL: URL {
         if
             let raw = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
@@ -62,7 +64,7 @@ final class APIClient {
         return url
     }
 
-    // DTO
+    // === DTO для твоего бэкенда (как было ранее) ===
     private struct RegisterDTO: Codable {
         let id: String
         let email: String
@@ -79,7 +81,8 @@ final class APIClient {
     }
     private struct OkDTO: Codable { let ok: Bool }
 
-    // MARK: - Твой бэкенд
+    // MARK: - Примеры методов твоего бэкенда (оставлены как были)
+
     func register(profile: UserProfile) async throws {
         let url = baseURL.appendingPathComponent("api/register")
         var req = URLRequest(url: url)
@@ -98,18 +101,16 @@ final class APIClient {
         if code != 200 {
             if let eb = try? JSONDecoder().decode(ErrBody.self, from: data) {
                 let human = eb.detail ?? eb.error ?? "unknown"
-                AppLog.e("workerChat status \(code): \(human)")
+                AppLog.e("register status \(code): \(human)")
                 if code == 401 { throw WorkerError.unauthorized }
                 throw WorkerError.badStatus(code)
             } else {
                 let snippet = String(data: data.prefix(300), encoding: .utf8) ?? ""
-                AppLog.e("workerChat status \(code) body: \(snippet)")
+                AppLog.e("register status \(code) body: \(snippet)")
                 if code == 401 { throw WorkerError.unauthorized }
                 throw WorkerError.badStatus(code)
             }
         }
-
-
     }
 
     func updateProfile(profile: UserProfile) async throws {
@@ -150,49 +151,21 @@ final class APIClient {
     }
 }
 
-// MARK: - Конфиг воркера (HMAC авторизация)
-import CryptoKit
-import UIKit
-
+// MARK: - Конфиг воркера (Cloudflare)
 private enum WorkerConfig {
-    /// WORKER_URL должен быть полным до хоста, без пути. Пример:
-    /// https://late-mode-309f.azatzidane.workers.dev
-    static var baseURL: URL? {
+    /// WORKER_URL — базовый URL воркера в Info.plist, без путей.
+    /// Пример: https://late-mode-309f.azatzidane.workers.dev
+    static var baseURL: URL {
         let raw = (Bundle.main.object(forInfoDictionaryKey: "WORKER_URL") as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return URL(string: raw)
+        guard let url = URL(string: raw) else { fatalError("WORKER_URL not set") }
+        return url
     }
 
-    /// CLIENT_TOKEN — общий секрет (совпадает со значением секрета в Cloudflare)
-    static var secret: String {
+    /// CLIENT_TOKEN — тот же секрет, что в Variables у воркера.
+    static var token: String {
         (Bundle.main.object(forInfoDictionaryKey: "CLIENT_TOKEN") as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
-
-    /// Заголовки авторизации для воркера: X-FM-Token/TS/Bundle/Device
-    static func makeHeaders() -> [String: String]? {
-        guard !secret.isEmpty else { return nil }
-
-        let ts = Int64(Date().timeIntervalSince1970)
-        let bundle = Bundle.main.bundleIdentifier ?? "unknown.bundle"
-        let device = UIDevice.current.identifierForVendor?.uuidString ?? "unknown-device"
-        let message = "\(bundle).\(device).\(ts)"
-
-        let key = SymmetricKey(data: Data(secret.utf8))
-        let mac = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: key)
-        let token = Data(mac).base64EncodedString() // ожидаемая длина 44
-
-        // Debug-вывод как в логе
-        let preview = token.prefix(3) + "…" + token.suffix(3)
-        print("[WorkerConfig] url=\(baseURL?.absoluteString ?? "nil"), tokenLen=\(token.count), tokenPreview=\(preview)")
-
-        return [
-            "X-FM-Token": token,
-            "X-FM-TS": String(ts),
-            "X-FM-Bundle": bundle,
-            "X-FM-Device": device,
-            "Content-Type": "application/json"
-        ]
     }
 }
 
@@ -210,31 +183,12 @@ private enum WorkerError: LocalizedError {
 // MARK: - Воркеры (ping + chat)
 extension APIClient {
 
-    private func workerRequest(path: String,
-                               method: String = "GET",
-                               body: Data? = nil) throws -> URLRequest {
-        guard let base = WorkerConfig.baseURL else {
-            throw WorkerError.missingConfig
-        }
-        var req = URLRequest(url: base.appendingPathComponent(path))
-        req.httpMethod = method
-        guard let headers = WorkerConfig.makeHeaders() else {
-            throw WorkerError.missingConfig
-        }
-        for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
-        if let body = body {
-            req.httpBody = body
-            // Content-Type уже поставлен в makeHeaders(), оставим как есть
-        }
-        req.setValue("FinMind/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
-        return req
-    }
-
-    /// Быстрый ping: используем CORS preflight на /v1/advise (возвращает 204 при успехе)
+    /// GET /healthz → true/false
     @discardableResult
     func workerPing() async -> Bool {
         do {
-            let req = try workerRequest(path: "ping", method: "GET")
+            var req = URLRequest(url: WorkerConfig.baseURL.appendingPathComponent("/healthz"))
+            req.httpMethod = "GET"
             let (_, resp) = try await session.data(for: req)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
             return code == 200
@@ -244,60 +198,74 @@ extension APIClient {
         }
     }
 
-    // MARK: Chat → /v1/advise
-
-    struct WorkerChatMessage: Codable { let role: String; let content: String }
-
-    /// Параметры, которые ждёт воркер (упрощённый формат)
-    private struct WorkerAdviseRequest: Codable {
-        let text: String
-        let system: String?
-        let model: String?
-        let temperature: Double?
+    // Формат сообщений для OpenAI
+    struct WorkerChatMessage: Codable {
+        let role: String   // "system" | "user" | "assistant"
+        let content: String
     }
 
-    /// Ответ воркера: { reply, model } или { error, detail }
-    private struct WorkerAdviseResponse: Codable {
-        let reply: String?
-        let model: String?
-        let error: String?
-        let detail: String?
-    }
-
+    /// Основной вызов к воркеру → OpenAI Chat Completions
+    /// Возвращает текст первого ответа.
     func workerChat(_ messages: [WorkerChatMessage],
-                    temperature: Double? = nil) async throws -> String {
-        // Вытащим system и последний user — под формат воркера
-        let systemText = messages.first(where: { $0.role.lowercased() == "system" })?.content
-        let userText = messages.last(where: { $0.role.lowercased() == "user" })?.content
-            ?? messages.map(\.content).joined(separator: "\n")
+                    temperature: Double = 0.2,
+                    model: String = "gpt-4o-mini",
+                    maxTokens: Int? = nil) async throws -> String {
 
-        let payload = WorkerAdviseRequest(
-            text: userText,
-            system: systemText,
-            model: "gpt-4o-mini",
-            temperature: temperature
-        )
+        // Санитизация: выкинем пустые строки
+        let msgs = messages.filter { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard !msgs.isEmpty else { throw WorkerError.badStatus(400) }
 
-        let body = try JSONEncoder().encode(payload)
-        let req  = try workerRequest(path: "v1/advise", method: "POST", body: body)
+        let temp = clampTemp(temperature)
 
+        // Сборка запроса
+        var req = URLRequest(url: WorkerConfig.baseURL.appendingPathComponent("/v1/chat/completions"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(WorkerConfig.token, forHTTPHeaderField: "x-client-token")
+        req.setValue("FinMind/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+
+        // Тело: обязательно "messages"
+        struct Body: Encodable {
+            let model: String
+            let messages: [WorkerChatMessage]
+            let temperature: Double
+            let max_tokens: Int?
+        }
+        let body = Body(model: model, messages: msgs, temperature: temp, max_tokens: maxTokens)
+        req.httpBody = try JSONEncoder().encode(body)
+
+        // Отправка
         let (data, resp) = try await session.data(for: req)
-        let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        print("[API] workerChat status =", status)
 
-        if code == 401 { throw WorkerError.unauthorized }
-        guard code == 200 else {
-            let snippet = String(data: data.prefix(300), encoding: .utf8) ?? ""
-            AppLog.e("workerChat status \(code) body: \(snippet)")
-            throw WorkerError.badStatus(code)
+        guard (200..<300).contains(status) else {
+            let txt = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            print("[API] workerChat error body:", txt)
+            if status == 401 { throw WorkerError.unauthorized }
+            throw WorkerError.badStatus(status)
         }
 
-        let decoded = try JSONDecoder().decode(WorkerAdviseResponse.self, from: data)
-        if let reply = decoded.reply { return reply }
-
-        // На всякий случай: если ответа нет, но воркер вернул описание ошибки
-        if let err = decoded.error ?? decoded.detail {
-            AppLog.e("workerChat logical error: \(err)")
+        // Мини-декодер OpenAI
+        struct ChatResponse: Decodable {
+            struct Choice: Decodable {
+                struct Msg: Decodable { let role: String; let content: String? }
+                let index: Int
+                let message: Msg
+            }
+            let choices: [Choice]
         }
-        return ""
+
+        let res = try JSONDecoder().decode(ChatResponse.self, from: data)
+        guard let text = res.choices.first?.message.content, !text.isEmpty else {
+            throw APIError.decoding
+        }
+        return text
+    }
+
+    // Утилиты
+    private func clampTemp(_ t: Double) -> Double {
+        guard t.isFinite else { return 0.2 }
+        return min(2.0, max(0.0, t))
     }
 }
