@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" useAutolayout="YES" useTraitCollections="YES" initialViewController="VC">
+  <scenes>
+    <scene sceneID="scene-launch">
+      <objects>
+        <viewController storyboardIdentifier="LaunchScreen" id="VC" sceneMemberID="viewController">
+          <view key="view" userInteractionEnabled="NO" contentMode="scaleToFill" id="ROOT">
+            <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+            <subviews>
+              <imageView translatesAutoresizingMaskIntoConstraints="NO" contentMode="scaleAspectFit" image="LaunchLogo" id="LOGO"/>
+            </subviews>
+            <constraints>
+              <constraint firstItem="LOGO" firstAttribute="centerX" secondItem="ROOT" secondAttribute="centerX" id="c1"/>
+              <constraint firstItem="LOGO" firstAttribute="centerY" secondItem="ROOT" secondAttribute="centerY" id="c2"/>
+              <constraint firstItem="LOGO" firstAttribute="width" secondItem="ROOT" secondAttribute="width" multiplier="0.28" id="c3"/>
+              <constraint firstItem="LOGO" firstAttribute="height" secondItem="LOGO" secondAttribute="width" multiplier="1" id="c4"/>
+              <constraint firstItem="LOGO" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="ROOT" secondAttribute="leading" constant="24" id="c5"/>
+              <constraint firstAttribute="trailing" relation="greaterThanOrEqual" secondItem="LOGO" secondAttribute="trailing" constant="24" id="c6"/>
+            </constraints>
+            <viewLayoutGuide key="safeArea" id="SAFE"/>
+          </view>
+        </viewController>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="FR" sceneMemberID="firstResponder"/>
+      </objects>
+    </scene>
+  </scenes>
+  <resources>
+    <image name="LaunchLogo" width="512" height="512"/>
+    <systemColor name="systemBackgroundColor">
+      <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+    </systemColor>
+  </resources>
+</document>

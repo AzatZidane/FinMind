@@ -1,10 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
+<key>UILaunchStoryboardName</key>
+<string>LaunchScreen</string>
+
+<key>CFBundleIcons</key>
 <dict>
-	<key>CLIENT_TOKEN</key>
-	<string>test_123</string>
-	<key>WORKER_URL</key>
-	<string>https://late-mode-309f.azatzidane.workers.dev</string>
+  <key>CFBundlePrimaryIcon</key>
+  <dict>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconFiles</key>
+    <array/>
+  </dict>
 </dict>
-</plist>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Нужен для выбора аватара профиля.</string>

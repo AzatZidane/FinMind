@@ -33,4 +33,18 @@ Carthage/Build/
 Worker/.dev.vars
 Worker/**/node_modules/
 Worker/.wrangler/
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# исходник иконки (он копируется в ассеты генератором)
+AppIcon1024.png
+
+# macOS
+.DS_Store
+
+# merge мусор
+*.orig
+
 
