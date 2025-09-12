@@ -50,6 +50,18 @@
             ReferencedContainer = "container:FinMind.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "WORKER_URL"
+            value = "https://late-mode-309f.azatzidane.workers.dev"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "CLIENT_TOKEN"
+            value = "IOfZK8jjzCvdNnNcTJXGQSfVhLaHy0DADItjZwTKWf4="
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
